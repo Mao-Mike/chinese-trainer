@@ -3,6 +3,7 @@ import { initTabs } from './ui.js';
 import { initDictionary } from './dictionary.js';
 import { initGeneration } from './generation.js';
 import { initStudy } from './study.js';
+import { initSettings } from './settings.js';
 
 async function bootstrap() {
 	try {
@@ -12,6 +13,7 @@ async function bootstrap() {
 		initTabs(study.renderStudy);
 		initDictionary();
 		initGeneration(study.renderStudy);
+		initSettings(); // Inizializza la sezione Impostazioni
 
 		if ('serviceWorker' in navigator) {
 			window.addEventListener('load', () => {

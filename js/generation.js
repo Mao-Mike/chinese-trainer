@@ -27,11 +27,6 @@ export function initGeneration(renderStudy) {
 
 	let lastGenerationRequest = null;
 
-	function resetStatus() {
-		setStatusState(genTitle, null);
-		retryBtn.classList.add('hidden');
-	}
-
 	function showLoading() {
 		genTitle.textContent = 'Generazione in corso...';
 		setStatusState(genTitle, 'loading');
@@ -61,7 +56,25 @@ export function initGeneration(renderStudy) {
 		}
 	};
 
+	function hasGeminiApiKey() {
+		try {
+			if (typeof localStorage === 'undefined') {
+				return false;
+			}
+
+			const value = localStorage.getItem('geminiApiKey') || localStorage.geminiApiKey;
+			return typeof value === 'string' && value.trim().length > 0;
+		} catch {
+			return false;
+		}
+	}
+
 	async function handleGeneration(request) {
+		if (!hasGeminiApiKey()) {
+			showError('Inserisci la Gemini API key in Impostazioni.');
+			return;
+		}
+
 		genBtn.disabled = true;
 		showLoading();
 
@@ -77,7 +90,7 @@ export function initGeneration(renderStudy) {
 			showSuccess(generated.title);
 			renderStudy();
 		} catch (error) {
-			showError('Errore durante la generazione. Riprova.');
+			showError('Errore durante la generazione. Controlla API key, modello o connessione.');
 			console.error(error);
 			renderStudy();
 		} finally {
@@ -90,14 +103,6 @@ export function initGeneration(renderStudy) {
 		const length = parseInt(genLength.value, 10);
 		const topic = genTopicInput.value.trim();
 		const words = await getAllWords();
-
-		if (!words.length && type === 'text') {
-			resetStatus();
-			genTitle.textContent = 'Aggiungi parole nel dizionario!';
-			setStatusState(genTitle, 'error-message');
-			renderStudy();
-			return;
-		}
 
 		lastGenerationRequest = { type, length, topic, words };
 		await handleGeneration(lastGenerationRequest);

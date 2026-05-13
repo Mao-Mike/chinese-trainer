@@ -19,6 +19,7 @@
 			<button class="tab-btn active" data-tab="dictionary">Dizionario</button>
 			<button class="tab-btn" data-tab="generation">Generazione</button>
 			<button class="tab-btn" data-tab="study">Studio</button>
+			<button class="tab-btn" data-tab="settings">Impostazioni</button>
 		</nav>
 	</header>
 	<main>
@@ -70,6 +71,24 @@
 			</div>
 			<div id="study-translation" class="study-text hidden"></div>
 			<div id="study-explanation" class="study-text hidden"></div>
+		</section>
+		<!-- Impostazioni -->
+		<section id="settings" class="tab-section">
+			<h2>Impostazioni AI</h2>
+			<div class="settings-group">
+				<label for="gemini-api-key">Gemini API key</label>
+				<input type="password" id="gemini-api-key" placeholder="Inserisci Gemini API key" autocomplete="off">
+			</div>
+			<div class="settings-group">
+				<label for="gemini-model">Modello Gemini</label>
+				<input type="text" id="gemini-model" value="gemini-2.5-flash" autocomplete="off">
+			</div>
+			<div class="settings-actions">
+				<button id="settings-save">Salva impostazioni</button>
+				<button id="settings-delete-key">Elimina API key</button>
+				<button id="settings-test">Test connessione</button>
+			</div>
+			<div id="settings-status" class="settings-status"></div>
 		</section>
 	</main>
 	<script type="module" src="js/main.js"></script>

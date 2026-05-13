@@ -1,5 +1,5 @@
+import { enrichWordWithAI } from './ai.js';
 import { addWord, clearDatabase, deleteWordById, getAllWords, importWords } from './storage.js';
-import { fakePinyin, fakeTranslation } from './utils.js';
 
 export function initDictionary() {
 	const dictInput = document.getElementById('dict-input');
@@ -79,20 +79,51 @@ export function initDictionary() {
 
 	dictSearchInput.addEventListener('input', filterAndRenderDict);
 
+	function hasGeminiApiKey() {
+		try {
+			if (typeof localStorage === 'undefined') {
+				return false;
+			}
+
+			const value = localStorage.getItem('geminiApiKey') || localStorage.geminiApiKey || '';
+			return typeof value === 'string' && value.trim().length > 0;
+		} catch {
+			return false;
+		}
+	}
+
 	dictAddBtn.onclick = async () => {
 		const hanzi = dictInput.value.trim();
 		if (!hanzi) return;
 
+		if (!hasGeminiApiKey()) {
+			alert('Inserisci la Gemini API key in Impostazioni.');
+			return;
+		}
+
+		const originalLabel = dictAddBtn.textContent;
+		dictAddBtn.disabled = true;
+		dictAddBtn.textContent = 'Cerco...';
+
 		try {
-			await addWord(hanzi, fakePinyin(hanzi), fakeTranslation(hanzi));
+			const enriched = await enrichWordWithAI(hanzi);
+			await addWord(
+				typeof enriched.hanzi === 'string' && enriched.hanzi.trim() ? enriched.hanzi.trim() : hanzi,
+				typeof enriched.pinyin === 'string' ? enriched.pinyin : '',
+				typeof enriched.translation === 'string' ? enriched.translation : ''
+			);
 			dictInput.value = '';
-			loadDict();
-		} catch (e) {
-			if (e.message === 'Duplicato') {
+			await loadDict();
+		} catch (error) {
+			if (error && error.message === 'Duplicato') {
 				alert('Questa parola esiste già!');
 			} else {
-				alert('Errore: ' + e.message);
+				console.error(error);
+				alert('Errore durante il recupero di pinyin/traduzione.');
 			}
+		} finally {
+			dictAddBtn.disabled = false;
+			dictAddBtn.textContent = 'Aggiungi';
 		}
 	};
 

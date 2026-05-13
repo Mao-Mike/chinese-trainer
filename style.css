@@ -1,3 +1,73 @@
+/* Impostazioni (Settings) */
+.settings-group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	margin-bottom: 1.2rem;
+	max-width: 400px;
+	margin-left: auto;
+	margin-right: auto;
+}
+.settings-group label {
+	font-size: 1.08rem;
+	color: #444;
+	margin-bottom: 0.1rem;
+}
+#gemini-api-key, #gemini-model {
+	width: 100%;
+	font-size: 1.13rem;
+	padding: 0.7rem 1rem;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	background: #fafbfc;
+	color: #222;
+	box-sizing: border-box;
+	margin-bottom: 0.2rem;
+}
+.settings-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.7rem;
+	justify-content: center;
+	margin-bottom: 1.1rem;
+}
+.settings-actions button {
+	flex: 1 1 12rem;
+	background: #007aff;
+	color: #fff;
+	border: none;
+	border-radius: 8px;
+	padding: 0.8rem 1.2rem;
+	font-size: 1.13rem;
+	cursor: pointer;
+	transition: background 0.2s;
+	margin-bottom: 0.2rem;
+}
+.settings-actions button:active {
+	background: #005bb5;
+}
+.settings-status {
+	min-height: 1.5em;
+	text-align: center;
+	color: #007aff;
+	font-size: 1.08rem;
+	margin-bottom: 0.5rem;
+}
+@media (max-width: 600px) {
+	.settings-group {
+		max-width: 98vw;
+		padding-left: 0.1rem;
+		padding-right: 0.1rem;
+	}
+	#gemini-api-key, #gemini-model {
+		font-size: 1.05rem;
+		padding: 0.7rem 0.7rem;
+	}
+	.settings-actions button {
+		font-size: 1.05rem;
+		padding: 0.7rem 0.7rem;
+	}
+}
 /* Generazione: campo argomento */
 .gen-topic-group {
 	display: flex;

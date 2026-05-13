@@ -11,6 +11,7 @@ const ASSETS = [
   'js/storage.js',
   'js/dictionary.js',
   'js/generation.js',
+  'js/settings.js',
   'js/study.js',
   'js/ui.js',
   'js/utils.js'
@@ -24,6 +25,7 @@ const NETWORK_FIRST_ASSETS = [
   'js/storage.js',
   'js/dictionary.js',
   'js/generation.js',
+  'js/settings.js',
   'js/study.js',
   'js/ui.js',
   'js/utils.js'
