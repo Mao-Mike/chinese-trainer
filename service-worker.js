@@ -1,30 +1,30 @@
 
-const CACHE_NAME = 'chinese-trainer-v3';
+const CACHE_NAME = 'chinese-trainer-v4';
 const ASSETS = [
-	'index.html',
-	'style.css',
-	'manifest.json',
-	'icon-192.png',
-	'icon-512.png',
-	'js/main.js',
-	'js/storage.js',
-	'js/dictionary.js',
-	'js/generation.js',
-	'js/study.js',
-	'js/ui.js',
-	'js/utils.js'
+  'index.html',
+  'style.css',
+  'manifest.json',
+  'icon-192.png',
+  'icon-512.png',
+  'js/main.js',
+  'js/storage.js',
+  'js/dictionary.js',
+  'js/generation.js',
+  'js/study.js',
+  'js/ui.js',
+  'js/utils.js'
 ];
 const NETWORK_FIRST_ASSETS = [
-	'index.html',
-	'style.css',
-	'manifest.json',
-	'js/main.js',
-	'js/storage.js',
-	'js/dictionary.js',
-	'js/generation.js',
-	'js/study.js',
-	'js/ui.js',
-	'js/utils.js'
+  'index.html',
+  'style.css',
+  'manifest.json',
+  'js/main.js',
+  'js/storage.js',
+  'js/dictionary.js',
+  'js/generation.js',
+  'js/study.js',
+  'js/ui.js',
+  'js/utils.js'
 ];
 
 self.addEventListener('install', event => {
