@@ -345,6 +345,10 @@ genBtn.onclick = async () => {
 		topic: topic || '',
 		words: words.length ? words : null
 	};
+    // Salva in localStorage
+    try {
+        localStorage.setItem('lastGenerated', JSON.stringify(window.lastGenerated));
+    } catch (e) { /* fallback silenzioso */ }
 	renderStudy();
 };
 
@@ -485,8 +489,15 @@ studyExplain.onclick = () => {
 	renderStudy();
 };
 
-// Carica subito se già generato
-if (window.lastGenerated) renderStudy();
+
+// All'avvio: carica lastGenerated da localStorage se esiste
+try {
+	const saved = localStorage.getItem('lastGenerated');
+	if (saved) {
+		window.lastGenerated = JSON.parse(saved);
+	}
+} catch (e) { window.lastGenerated = null; }
+renderStudy();
 
 // --- PWA Service Worker ---
 if ('serviceWorker' in navigator) {

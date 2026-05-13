@@ -38,6 +38,7 @@
 	font-size: 1.01rem;
 	margin-bottom: 0.3rem;
 }
+/* Slider Generazione coerente */
 #gen-length {
 	width: 100%;
 	max-width: 280px;
@@ -105,6 +106,7 @@
 .dialogue-content {
 	flex: 1;
 }
+/* Studio: testo coerente */
 .study-text {
 	background: #fff;
 	border-radius: 12px;
@@ -309,7 +311,7 @@ main {
 	background: #e0e1e5;
 }
 
-/* Generazione */
+/* Generazione coerente */
 .gen-type {
 	display: flex;
 	gap: 1.5rem;
@@ -319,10 +321,6 @@ main {
 .gen-slider {
 	margin-bottom: 1rem;
 	text-align: center;
-}
-#gen-length {
-	width: 100%;
-	margin-top: 0.3rem;
 }
 #gen-generate {
 	background: #007aff;
@@ -350,7 +348,7 @@ main {
 	word-break: break-word;
 }
 
-/* Studio */
+# Studio coerente
 .study-text {
 	background: #fff;
 	border-radius: 12px;
