@@ -1,0 +1,246 @@
+
+html, body {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	font-family: 'SF Pro Display', 'Segoe UI', Arial, sans-serif;
+	background: #f7f8fa;
+	color: #222;
+}
+
+body {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+}
+
+header {
+	background: #fff;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+	padding: 1rem 0 0.5rem 0;
+	position: sticky;
+	top: 0;
+	z-index: 10;
+}
+
+h1 {
+	text-align: center;
+	font-size: 2rem;
+	margin: 0 0 0.5rem 0;
+	letter-spacing: 1px;
+}
+
+nav {
+	display: flex;
+	justify-content: center;
+	gap: 0.5rem;
+	margin-bottom: 0.5rem;
+}
+
+.tab-btn {
+	background: #f0f1f5;
+	border: none;
+	border-radius: 20px 20px 0 0;
+	padding: 0.5rem 1.2rem;
+	font-size: 1rem;
+	color: #888;
+	cursor: pointer;
+	transition: background 0.2s, color 0.2s;
+}
+.tab-btn.active {
+	background: #007aff;
+	color: #fff;
+}
+
+main {
+	flex: 1;
+	padding: 1rem 0.5rem 2.5rem 0.5rem;
+	max-width: 500px;
+	margin: 0 auto;
+	width: 100%;
+}
+
+.tab-section {
+	display: none;
+}
+.tab-section.active {
+	display: block;
+	animation: fadeIn 0.3s;
+}
+@keyframes fadeIn {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+/* Dizionario */
+.input-group {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 1rem;
+}
+#dict-input {
+	flex: 1;
+	padding: 0.6rem;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	font-size: 1.1rem;
+}
+#dict-add {
+	background: #007aff;
+	color: #fff;
+	border: none;
+	border-radius: 8px;
+	padding: 0.6rem 1.2rem;
+	font-size: 1rem;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+#dict-add:active {
+	background: #005bb5;
+}
+#dict-list {
+	list-style: none;
+	padding: 0;
+	margin: 0 0 1rem 0;
+}
+#dict-list li {
+	background: #fff;
+	border-radius: 8px;
+	margin-bottom: 0.5rem;
+	padding: 0.7rem 1rem;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+	font-size: 1.1rem;
+}
+.dict-word {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+}
+.dict-pinyin {
+	color: #007aff;
+	font-size: 0.95rem;
+}
+.dict-translation {
+	color: #888;
+	font-size: 0.95rem;
+}
+.dict-delete {
+	background: #ff3b30;
+	color: #fff;
+	border: none;
+	border-radius: 6px;
+	padding: 0.3rem 0.7rem;
+	font-size: 0.95rem;
+	cursor: pointer;
+	margin-left: 1rem;
+	transition: background 0.2s;
+}
+.dict-delete:active {
+	background: #c1271a;
+}
+.dict-actions {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 1rem;
+}
+#dict-export, #dict-import {
+	background: #f0f1f5;
+	color: #007aff;
+	border: none;
+	border-radius: 8px;
+	padding: 0.5rem 1.2rem;
+	font-size: 1rem;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+#dict-export:active, #dict-import:active {
+	background: #e0e1e5;
+}
+
+/* Generazione */
+.gen-type {
+	display: flex;
+	gap: 1.5rem;
+	margin-bottom: 1rem;
+	justify-content: center;
+}
+.gen-slider {
+	margin-bottom: 1rem;
+	text-align: center;
+}
+#gen-length {
+	width: 100%;
+	margin-top: 0.3rem;
+}
+#gen-generate {
+	background: #007aff;
+	color: #fff;
+	border: none;
+	border-radius: 8px;
+	padding: 0.7rem 1.5rem;
+	font-size: 1.1rem;
+	cursor: pointer;
+	display: block;
+	margin: 0.5rem auto 1rem auto;
+	transition: background 0.2s;
+}
+#gen-generate:active {
+	background: #005bb5;
+}
+#gen-output {
+	background: #fff;
+	border-radius: 8px;
+	padding: 1rem;
+	min-height: 2.5rem;
+	box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+	font-size: 1.1rem;
+	margin-bottom: 1rem;
+	word-break: break-word;
+}
+
+/* Studio */
+.study-text {
+	background: #fff;
+	border-radius: 8px;
+	padding: 1rem;
+	margin-bottom: 0.7rem;
+	font-size: 1.2rem;
+	box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+	text-align: center;
+	min-height: 2.5rem;
+	word-break: break-word;
+}
+.study-actions {
+	display: flex;
+	gap: 0.5rem;
+	justify-content: center;
+	margin-bottom: 0.7rem;
+}
+.study-actions button {
+	background: #f0f1f5;
+	color: #007aff;
+	border: none;
+	border-radius: 8px;
+	padding: 0.5rem 1.2rem;
+	font-size: 1rem;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+.study-actions button:active {
+	background: #e0e1e5;
+}
+.hidden {
+	display: none !important;
+}
+
+@media (max-width: 600px) {
+	main {
+		padding: 1rem 0.2rem 2.5rem 0.2rem;
+	}
+	h1 {
+		font-size: 1.3rem;
+	}
+}

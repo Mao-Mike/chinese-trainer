@@ -1,0 +1,63 @@
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+	<meta name="theme-color" content="#ffffff">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="default">
+	<title>Chinese Trainer</title>
+	<link rel="manifest" href="manifest.json">
+	<link rel="stylesheet" href="style.css">
+	<link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+	<header>
+		<h1>Chinese Trainer</h1>
+		<nav>
+			<button class="tab-btn active" data-tab="dictionary">Dizionario</button>
+			<button class="tab-btn" data-tab="generation">Generazione</button>
+			<button class="tab-btn" data-tab="study">Studio</button>
+		</nav>
+	</header>
+	<main>
+		<section id="dictionary" class="tab-section active">
+			<div class="input-group">
+				<input type="text" id="dict-input" placeholder="Parola o carattere cinese">
+				<button id="dict-add">Aggiungi</button>
+			</div>
+			<ul id="dict-list"></ul>
+			<div class="dict-actions">
+				<button id="dict-export">Esporta JSON</button>
+				<input type="file" id="dict-import-file" accept="application/json" style="display:none">
+				<button id="dict-import">Importa JSON</button>
+			</div>
+		</section>
+		<section id="generation" class="tab-section">
+			<div class="gen-type">
+				<label><input type="radio" name="gen-type" value="text" checked> Testo</label>
+				<label><input type="radio" name="gen-type" value="dialogue"> Dialogo</label>
+			</div>
+			<div class="gen-slider">
+				<label for="gen-length">Lunghezza: <span id="gen-length-value">100</span></label>
+				<input type="range" id="gen-length" min="0" max="1000" value="100">
+			</div>
+			<button id="gen-generate">Genera</button>
+			<div id="gen-output"></div>
+		</section>
+		<section id="study" class="tab-section">
+			<div id="study-chinese" class="study-text"></div>
+			<div class="study-actions">
+				<button id="study-show-pinyin">Mostra pinyin</button>
+				<button id="study-show-translation">Mostra traduzione</button>
+				<button id="study-explain">Spiega traduzione</button>
+			</div>
+			<div id="study-pinyin" class="study-text hidden"></div>
+			<div id="study-translation" class="study-text hidden"></div>
+			<div id="study-explanation" class="study-text hidden"></div>
+		</section>
+	</main>
+	<script src="app.js"></script>
+</body>
+</html>
