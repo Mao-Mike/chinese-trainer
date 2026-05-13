@@ -5,21 +5,27 @@ import { initGeneration } from './generation.js';
 import { initStudy } from './study.js';
 
 async function bootstrap() {
-	await openDB();
+	try {
+		await openDB();
 
-	const study = initStudy();
-	initTabs(study.renderStudy);
-	initDictionary();
-	initGeneration(study.renderStudy);
+		const study = initStudy();
+		initTabs(study.renderStudy);
+		initDictionary();
+		initGeneration(study.renderStudy);
 
-	if ('serviceWorker' in navigator) {
-		window.addEventListener('load', () => {
-			navigator.serviceWorker.register('service-worker.js').then(() => {
-				console.log('Service Worker Registered');
+		if ('serviceWorker' in navigator) {
+			window.addEventListener('load', () => {
+				navigator.serviceWorker.register('service-worker.js').then(() => {
+					console.log('Service Worker Registered');
+				}).catch(error => {
+					console.error('Service worker registration failed:', error);
+				});
 			});
-		});
-	} else {
-		console.warn('Service Worker not supported in this browser');
+		} else {
+			console.warn('Service Worker not supported in this browser');
+		}
+	} catch (error) {
+		console.error('Bootstrap failed:', error);
 	}
 }
 

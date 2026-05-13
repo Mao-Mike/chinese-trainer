@@ -1,11 +1,12 @@
 
-const CACHE_NAME = 'chinese-trainer-v4';
+const CACHE_NAME = 'chinese-trainer-v5';
 const ASSETS = [
   'index.html',
   'style.css',
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
+  'js/ai.js',
   'js/main.js',
   'js/storage.js',
   'js/dictionary.js',
@@ -18,6 +19,7 @@ const NETWORK_FIRST_ASSETS = [
   'index.html',
   'style.css',
   'manifest.json',
+  'js/ai.js',
   'js/main.js',
   'js/storage.js',
   'js/dictionary.js',

@@ -1,5 +1,5 @@
 import { loadLastGenerated } from './storage.js';
-import { fakePinyin, fakeTranslation } from './utils.js';
+import { escapeHTML, fakeTranslation, isValidGeneratedContent, normalizeGeneratedContent } from './utils.js';
 
 export function initStudy() {
 	const studyChinese = document.getElementById('study-chinese');
@@ -13,51 +13,34 @@ export function initStudy() {
 	let translationVisible = false;
 	let explanationVisible = false;
 
-	function splitWithRefs(text, blockSize = 100) {
-		const blocks = [];
-		let i = 0;
-
-		while (i < text.length) {
-			blocks.push(text.slice(i, i + blockSize));
-			i += blockSize;
+	function setMessageState(element, state) {
+		element.classList.remove('loading', 'error-message', 'success-message');
+		if (state) {
+			element.classList.add(state);
 		}
-
-		return blocks.map((block, idx) => ({ text: block, ref: `[${idx + 1}]` }));
 	}
 
-	function renderChineseBlock(hanzi, pinyin, showPinyin) {
+	function renderChineseBlock(token, showPinyin) {
+		const pinyin = escapeHTML(token.pinyin || '');
+		const hanzi = escapeHTML(token.hanzi || '');
 		return `<span class="chinese-block">${showPinyin ? `<span class="pinyin">${pinyin}</span>` : ''}<span class="hanzi">${hanzi}</span></span>`;
 	}
 
-	function renderStudyLine(hanziLine, showPinyin) {
-		const hanziArr = hanziLine.split('');
-		const pinyinArr = fakePinyin(hanziLine).split(' ');
-		let blocks = '';
-
-		for (let i = 0; i < hanziArr.length; i++) {
-			blocks += renderChineseBlock(hanziArr[i], pinyinArr[i] || '', showPinyin);
-		}
-
-		return `<span class="study-line">${blocks}</span>`;
+	function renderStudyLine(tokens, showPinyin) {
+		return `<span class="study-line">${tokens.map(token => renderChineseBlock(token, showPinyin)).join('')}</span>`;
 	}
 
-	function renderDialogueLine(speaker, hanziLine, showPinyin) {
-		const hanziArr = hanziLine.split('');
-		const pinyinArr = fakePinyin(hanziLine).split(' ');
-		let blocks = '';
-
-		for (let i = 0; i < hanziArr.length; i++) {
-			blocks += renderChineseBlock(hanziArr[i], pinyinArr[i] || '', showPinyin);
-		}
-
-		return `<div class="dialogue-line"><span class="dialogue-speaker">${speaker}:</span><span class="dialogue-content study-line">${blocks}</span></div>`;
+	function renderDialogueLine(block, showPinyin) {
+		const speaker = escapeHTML(block.speaker || '');
+		return `<div class="dialogue-line"><span class="dialogue-speaker">${speaker}:</span><span class="dialogue-content study-line">${block.tokens.map(token => renderChineseBlock(token, showPinyin)).join('')}</span></div>`;
 	}
 
 	function renderStudy() {
-		const last = loadLastGenerated();
+		const normalized = normalizeGeneratedContent(loadLastGenerated());
 
-		if (!last || !last.content) {
+		if (!normalized) {
 			studyChinese.textContent = 'Nessun testo generato. Usa la sezione Generazione.';
+			setMessageState(studyChinese, 'error-message');
 			studyTranslation.textContent = '';
 			studyExplanation.textContent = '';
 			studyTranslation.classList.add('hidden');
@@ -66,15 +49,27 @@ export function initStudy() {
 			return;
 		}
 
-		if (last.type === 'text') {
-			const blocks = splitWithRefs(last.content);
-			studyChinese.innerHTML = blocks
-				.map(block => renderStudyLine(block.text, pinyinVisible) + `<span style="color:#bbb;margin-left:0.5em">${block.ref}</span>`)
+		if (!isValidGeneratedContent(normalized)) {
+			studyChinese.textContent = 'Il contenuto generato non è valido. Genera un nuovo testo.';
+			setMessageState(studyChinese, 'error-message');
+			studyTranslation.textContent = '';
+			studyExplanation.textContent = '';
+			studyTranslation.classList.add('hidden');
+			studyExplanation.classList.add('hidden');
+			studyShowPinyin.textContent = pinyinVisible ? 'Nascondi pinyin' : 'Mostra pinyin';
+			return;
+		}
+
+		setMessageState(studyChinese, null);
+
+		if (normalized.type === 'text') {
+			studyChinese.innerHTML = normalized.blocks
+				.map(block => renderStudyLine(block.tokens, pinyinVisible) + `<span style="color:#bbb;margin-left:0.5em">${escapeHTML(block.ref)}</span>`)
 				.join('');
 
 			if (translationVisible) {
-				studyTranslation.innerHTML = blocks
-					.map(block => `<div>${fakeTranslation(block.text)} <span style="color:#bbb">${block.ref}</span></div>`)
+				studyTranslation.innerHTML = normalized.blocks
+					.map(block => `<div>${escapeHTML(block.translation || fakeTranslation(block.chinese))} <span style="color:#bbb">${escapeHTML(block.ref)}</span></div>`)
 					.join('');
 				studyTranslation.classList.remove('hidden');
 				studyExplanation.classList.add('hidden');
@@ -83,8 +78,8 @@ export function initStudy() {
 			}
 
 			if (explanationVisible) {
-				studyExplanation.innerHTML = blocks
-					.map(block => `<div>Spiegazione di: ${block.text} <span style="color:#bbb">${block.ref}</span></div>`)
+				studyExplanation.innerHTML = normalized.blocks
+					.map(block => `<div>${escapeHTML(block.explanation || `Spiegazione di: ${block.chinese}`)} <span style="color:#bbb">${escapeHTML(block.ref)}</span></div>`)
 					.join('');
 				studyExplanation.classList.remove('hidden');
 				studyTranslation.classList.add('hidden');
@@ -92,19 +87,14 @@ export function initStudy() {
 				studyExplanation.classList.add('hidden');
 			}
 		} else {
-			const lines = last.content.split('\n');
-			studyChinese.innerHTML = lines.map((line, idx) => {
-				const [speaker, ...phraseArr] = line.split(':');
-				const phrase = phraseArr.join(':').trim();
-				return renderDialogueLine(speaker, phrase, pinyinVisible) + `<span style="color:#bbb;margin-left:0.5em">[${idx + 1}]</span>`;
-			}).join('');
+			studyChinese.innerHTML = normalized.blocks
+				.map(block => renderDialogueLine(block, pinyinVisible) + `<span style="color:#bbb;margin-left:0.5em">${escapeHTML(block.ref)}</span>`)
+				.join('');
 
 			if (translationVisible) {
-				studyTranslation.innerHTML = lines.map((line, idx) => {
-					const [speaker, ...phraseArr] = line.split(':');
-					const phrase = phraseArr.join(':').trim();
-					return `<div class="dialogue-line"><span class="dialogue-speaker">${speaker}:</span><span class="dialogue-content">${fakeTranslation(phrase)}</span><span style="color:#bbb;margin-left:0.5em">[${idx + 1}]</span></div>`;
-				}).join('');
+				studyTranslation.innerHTML = normalized.blocks
+					.map(block => `<div class="dialogue-line"><span class="dialogue-speaker">${escapeHTML(block.speaker || '')}:</span><span class="dialogue-content">${escapeHTML(block.translation || fakeTranslation(block.chinese))}</span><span style="color:#bbb;margin-left:0.5em">${escapeHTML(block.ref)}</span></div>`)
+					.join('');
 				studyTranslation.classList.remove('hidden');
 				studyExplanation.classList.add('hidden');
 			} else {
@@ -112,11 +102,9 @@ export function initStudy() {
 			}
 
 			if (explanationVisible) {
-				studyExplanation.innerHTML = lines.map((line, idx) => {
-					const [speaker, ...phraseArr] = line.split(':');
-					const phrase = phraseArr.join(':').trim();
-					return `<div class="dialogue-line"><span class="dialogue-speaker">${speaker}:</span><span class="dialogue-content">Spiegazione di: ${phrase}</span><span style="color:#bbb;margin-left:0.5em">[${idx + 1}]</span></div>`;
-				}).join('');
+				studyExplanation.innerHTML = normalized.blocks
+					.map(block => `<div class="dialogue-line"><span class="dialogue-speaker">${escapeHTML(block.speaker || '')}:</span><span class="dialogue-content">${escapeHTML(block.explanation || `Spiegazione di: ${block.chinese}`)}</span><span style="color:#bbb;margin-left:0.5em">${escapeHTML(block.ref)}</span></div>`)
+					.join('');
 				studyExplanation.classList.remove('hidden');
 				studyTranslation.classList.add('hidden');
 			} else {

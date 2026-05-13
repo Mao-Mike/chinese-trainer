@@ -29,7 +29,17 @@ export function initDictionary() {
 			const li = document.createElement('li');
 			const wordDiv = document.createElement('div');
 			wordDiv.className = 'dict-word';
-			wordDiv.innerHTML = `<span>${word.hanzi}</span><span class="dict-pinyin">${word.pinyin}</span><span class="dict-translation">${word.translation}</span>`;
+			const hanziSpan = document.createElement('span');
+			hanziSpan.textContent = word.hanzi;
+			const pinyinSpan = document.createElement('span');
+			pinyinSpan.className = 'dict-pinyin';
+			pinyinSpan.textContent = word.pinyin;
+			const translationSpan = document.createElement('span');
+			translationSpan.className = 'dict-translation';
+			translationSpan.textContent = word.translation;
+			wordDiv.appendChild(hanziSpan);
+			wordDiv.appendChild(pinyinSpan);
+			wordDiv.appendChild(translationSpan);
 
 			const delBtn = document.createElement('button');
 			delBtn.className = 'dict-delete';

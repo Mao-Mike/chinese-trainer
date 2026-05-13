@@ -1,3 +1,5 @@
+import { createDemoTokens, fakeTranslation } from './utils.js';
+
 const DB_NAME = 'chinese_trainer_db';
 const DB_STORE = 'words';
 const DB_VERSION = 2;
@@ -92,8 +94,93 @@ export function saveLastGenerated(lastGenerated) {
 export function loadLastGenerated() {
 	try {
 		const raw = localStorage.getItem('lastGenerated');
-		return raw ? JSON.parse(raw) : null;
+		if (!raw) return null;
+		const parsed = JSON.parse(raw);
+		const normalized = normalizeLastGenerated(parsed);
+		if (normalized !== parsed) {
+			saveLastGenerated(normalized);
+		}
+		return normalized;
 	} catch {
 		return null;
 	}
+}
+
+function normalizeLastGenerated(value) {
+	if (!value || typeof value !== 'object') return null;
+	if (Array.isArray(value.blocks)) return value;
+	if (typeof value.content !== 'string') return null;
+
+	if (value.type === 'dialogue') {
+		const lines = value.content.split('\n').filter(Boolean);
+		return {
+			id: value.id || makeId(),
+			createdAt: value.createdAt || Date.now(),
+			type: 'dialogue',
+			title: value.title || '',
+			topic: value.topic || '',
+			targetLength: value.targetLength || value.content.length,
+			blocks: lines.map((line, index) => {
+				const [speakerRaw, ...phraseParts] = line.split(':');
+				const speaker = (speakerRaw || '').trim() || null;
+				const chinese = phraseParts.join(':').trim();
+				return {
+					ref: `[${index + 1}]`,
+					speaker,
+					chinese,
+					tokens: createDemoTokens(chinese),
+					translation: fakeTranslation(chinese),
+					explanation: `Spiegazione di: ${chinese}`
+				};
+			}),
+			usedWords: simplifyWords(value.words || []),
+			newWords: []
+		};
+	}
+
+	const content = value.content;
+	const chunks = [];
+	let i = 0;
+	while (i < content.length) {
+		chunks.push(content.slice(i, i + 100));
+		i += 100;
+	}
+
+	return {
+		id: value.id || makeId(),
+		createdAt: value.createdAt || Date.now(),
+		type: 'text',
+		title: value.title || '',
+		topic: value.topic || '',
+		targetLength: value.targetLength || content.length,
+		blocks: chunks.map((chunk, index) => ({
+			ref: `[${index + 1}]`,
+			speaker: null,
+			chinese: chunk,
+			tokens: createDemoTokens(chunk),
+			translation: fakeTranslation(chunk),
+			explanation: `Spiegazione di: ${chunk}`
+		})),
+		usedWords: simplifyWords(value.words || []),
+		newWords: []
+	};
+}
+
+function simplifyWords(words) {
+	return Array.isArray(words)
+		? words
+			.filter(word => word && word.hanzi)
+			.map(word => ({
+				hanzi: word.hanzi,
+				pinyin: word.pinyin || '',
+				translation: word.translation || ''
+			}))
+		: [];
+}
+
+function makeId() {
+	if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+		return crypto.randomUUID();
+	}
+	return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }

@@ -1,88 +1,11 @@
+import { generateContentWithAI } from './ai.js';
 import { getAllWords, saveLastGenerated } from './storage.js';
-import { pick, randomInt, shuffle } from './utils.js';
 
-function randomTitle(type, topic) {
-	if (topic && topic.trim()) {
-		return type === 'dialogue' ? `Dialogo su "${topic.trim()}"` : `Testo su "${topic.trim()}"`;
+function setStatusState(element, state) {
+	element.classList.remove('loading', 'error-message', 'success-message');
+	if (state) {
+		element.classList.add(state);
 	}
-
-	const textTitles = [
-		'Una giornata a scuola',
-		'Il mio animale preferito',
-		'Viaggio in città',
-		'Cosa mangio a colazione',
-		'Un sogno divertente',
-		'La mia famiglia',
-		'Un giorno di pioggia',
-		'Al mercato',
-		'La mia routine',
-		'Un ricordo speciale'
-	];
-
-	const dialogueTitles = [
-		'Conversazione al ristorante',
-		'Due amici si incontrano',
-		'Comprare un biglietto',
-		'Dialogo in classe',
-		'Chiedere indicazioni',
-		'Al telefono',
-		'In biblioteca',
-		'Al parco',
-		'In viaggio',
-		'Alla stazione'
-	];
-
-	return type === 'dialogue' ? pick(dialogueTitles) : pick(textTitles);
-}
-
-function generateDemoText(words, length) {
-	const pool = words.length ? shuffle(words) : [
-		{ hanzi: '我', pinyin: 'wǒ', translation: 'io' },
-		{ hanzi: '喜欢', pinyin: 'xǐ huān', translation: 'piace' },
-		{ hanzi: '学习', pinyin: 'xué xí', translation: 'studiare' },
-		{ hanzi: '中文', pinyin: 'zhōng wén', translation: 'cinese' },
-		{ hanzi: '朋友', pinyin: 'péng you', translation: 'amico' },
-		{ hanzi: '吃饭', pinyin: 'chī fàn', translation: 'mangiare' },
-		{ hanzi: '学校', pinyin: 'xué xiào', translation: 'scuola' },
-		{ hanzi: '老师', pinyin: 'lǎo shī', translation: 'insegnante' }
-	];
-
-	let out = '';
-	while (out.length < length) {
-		out += pick(pool).hanzi;
-		if (Math.random() > 0.7) out += '，';
-	}
-	return out.slice(0, length) + '。';
-}
-
-function generateDemoDialogue(words, length) {
-	const pool = words.length ? shuffle(words) : [
-		{ hanzi: '你', pinyin: 'nǐ', translation: 'tu' },
-		{ hanzi: '好吗', pinyin: 'hǎo ma', translation: 'come va' },
-		{ hanzi: '谢谢', pinyin: 'xiè xie', translation: 'grazie' },
-		{ hanzi: '再见', pinyin: 'zài jiàn', translation: 'arrivederci' },
-		{ hanzi: '今天', pinyin: 'jīn tiān', translation: 'oggi' },
-		{ hanzi: '天气', pinyin: 'tiān qì', translation: 'tempo (meteo)' },
-		{ hanzi: '很好', pinyin: 'hěn hǎo', translation: 'molto bene' },
-		{ hanzi: '请问', pinyin: 'qǐng wèn', translation: 'scusi' }
-	];
-
-	const nSpeakers = randomInt(2, 4);
-	const names = ['A', 'B', 'C', 'D'].slice(0, nSpeakers);
-	const lines = [];
-	let total = 0;
-
-	while (total < length) {
-		const name = pick(names);
-		let phrase = '';
-		for (let i = 0; i < randomInt(2, 7); i++) {
-			phrase += pick(pool).hanzi;
-		}
-		lines.push(name + ': ' + phrase);
-		total += phrase.length;
-	}
-
-	return lines.join('\n');
 }
 
 export function initGeneration(renderStudy) {
@@ -92,11 +15,75 @@ export function initGeneration(renderStudy) {
 	const genBtn = document.getElementById('gen-generate');
 	const genTitle = document.getElementById('gen-title');
 	const genTopicInput = document.getElementById('gen-topic');
+	const retryBtn = document.getElementById('gen-retry') || (() => {
+		const button = document.createElement('button');
+		button.id = 'gen-retry';
+		button.type = 'button';
+		button.textContent = 'Riprova';
+		button.classList.add('hidden');
+		genTitle.insertAdjacentElement('afterend', button);
+		return button;
+	})();
+
+	let lastGenerationRequest = null;
+
+	function resetStatus() {
+		setStatusState(genTitle, null);
+		retryBtn.classList.add('hidden');
+	}
+
+	function showLoading() {
+		genTitle.textContent = 'Generazione in corso...';
+		setStatusState(genTitle, 'loading');
+		retryBtn.classList.add('hidden');
+	}
+
+	function showError(message) {
+		genTitle.textContent = message;
+		setStatusState(genTitle, 'error-message');
+		retryBtn.classList.remove('hidden');
+	}
+
+	function showSuccess(title) {
+		genTitle.textContent = title;
+		setStatusState(genTitle, 'success-message');
+		retryBtn.classList.add('hidden');
+	}
 
 	genLengthValue.textContent = genLength.value;
 	genLength.oninput = () => {
 		genLengthValue.textContent = genLength.value;
 	};
+
+	retryBtn.onclick = () => {
+		if (lastGenerationRequest) {
+			handleGeneration(lastGenerationRequest);
+		}
+	};
+
+	async function handleGeneration(request) {
+		genBtn.disabled = true;
+		showLoading();
+
+		try {
+			const generated = await generateContentWithAI({
+				type: request.type,
+				topic: request.topic,
+				targetLength: request.length,
+				words: request.words
+			});
+
+			saveLastGenerated(generated);
+			showSuccess(generated.title);
+			renderStudy();
+		} catch (error) {
+			showError('Errore durante la generazione. Riprova.');
+			console.error(error);
+			renderStudy();
+		} finally {
+			genBtn.disabled = false;
+		}
+	}
 
 	genBtn.onclick = async () => {
 		const type = Array.from(genTypeRadios).find(radio => radio.checked).value;
@@ -105,24 +92,14 @@ export function initGeneration(renderStudy) {
 		const words = await getAllWords();
 
 		if (!words.length && type === 'text') {
+			resetStatus();
 			genTitle.textContent = 'Aggiungi parole nel dizionario!';
-			saveLastGenerated(null);
+			setStatusState(genTitle, 'error-message');
 			renderStudy();
 			return;
 		}
 
-		const title = randomTitle(type, topic);
-		const content = type === 'text' ? generateDemoText(words, length) : generateDemoDialogue(words, length);
-
-		saveLastGenerated({
-			type,
-			title,
-			content,
-			topic: topic || '',
-			words: words.length ? words : null
-		});
-
-		genTitle.textContent = title;
-		renderStudy();
+		lastGenerationRequest = { type, length, topic, words };
+		await handleGeneration(lastGenerationRequest);
 	};
 }
