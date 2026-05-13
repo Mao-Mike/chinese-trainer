@@ -340,7 +340,6 @@ genBtn.onclick = async () => {
 
 // --- Studio aggiornata ---
 const studyChinese = document.getElementById('study-chinese');
-const studyPinyin = document.getElementById('study-pinyin');
 const studyTranslation = document.getElementById('study-translation');
 const studyExplanation = document.getElementById('study-explanation');
 const studyShowPinyin = document.getElementById('study-show-pinyin');
@@ -394,10 +393,8 @@ function renderStudy() {
 	const last = window.lastGenerated;
 	if (!last || !last.content) {
 		studyChinese.textContent = 'Nessun testo generato. Usa la sezione Generazione.';
-		studyPinyin.textContent = '';
 		studyTranslation.textContent = '';
 		studyExplanation.textContent = '';
-		studyPinyin.classList.add('hidden');
 		studyTranslation.classList.add('hidden');
 		studyExplanation.classList.add('hidden');
 		return;
@@ -406,7 +403,6 @@ function renderStudy() {
 	if (last.type === 'text') {
 		const blocks = splitWithRefs(last.content);
 		studyChinese.innerHTML = blocks.map(b => renderStudyLine(b.text, fakePinyin(b.text), pinyinVisible) + `<span style='color:#bbb;margin-left:0.5em'>${b.ref}</span>`).join('');
-		studyPinyin.classList.add('hidden');
 		// Traduzione
 		if (translationVisible) {
 			studyTranslation.innerHTML = blocks.map(b => `<div>${fakeTranslation(b.text)} <span style='color:#bbb'>${b.ref}</span></div>`).join('');
@@ -431,7 +427,6 @@ function renderStudy() {
 			const phrase = phraseArr.join(':').trim();
 			return renderDialogueLine(speaker, phrase, pinyinVisible) + `<span style='color:#bbb;margin-left:0.5em'>[${idx + 1}]</span>`;
 		}).join('');
-		studyPinyin.classList.add('hidden');
 		// Traduzione
 		if (translationVisible) {
 			studyTranslation.innerHTML = lines.map((line, idx) => {
