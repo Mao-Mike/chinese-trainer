@@ -1,12 +1,31 @@
 
-const CACHE_NAME = 'chinese-trainer-v2';
+const CACHE_NAME = 'chinese-trainer-v3';
 const ASSETS = [
 	'index.html',
 	'style.css',
-	'app.js',
-	'manifest.json'
+	'manifest.json',
+	'icon-192.png',
+	'icon-512.png',
+	'js/main.js',
+	'js/storage.js',
+	'js/dictionary.js',
+	'js/generation.js',
+	'js/study.js',
+	'js/ui.js',
+	'js/utils.js'
 ];
-const NETWORK_FIRST_ASSETS = ASSETS;
+const NETWORK_FIRST_ASSETS = [
+	'index.html',
+	'style.css',
+	'manifest.json',
+	'js/main.js',
+	'js/storage.js',
+	'js/dictionary.js',
+	'js/generation.js',
+	'js/study.js',
+	'js/ui.js',
+	'js/utils.js'
+];
 
 self.addEventListener('install', event => {
 	event.waitUntil(
@@ -32,7 +51,9 @@ self.addEventListener('fetch', event => {
 		requestUrl.pathname.endsWith(`/${asset}`) || requestUrl.pathname.endsWith(asset)
 	);
 
-	if (isNetworkFirstAsset) {
+	const isNavigationRequest = event.request.mode === 'navigate';
+
+	if (isNetworkFirstAsset || isNavigationRequest) {
 		event.respondWith(
 			fetch(event.request)
 				.then(response => {
@@ -40,7 +61,7 @@ self.addEventListener('fetch', event => {
 					caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
 					return response;
 				})
-				.catch(() => caches.match(event.request))
+				.catch(() => caches.match(event.request).then(cached => cached || caches.match('index.html')))
 		);
 		return;
 	}
