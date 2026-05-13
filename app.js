@@ -91,21 +91,27 @@ const dictImportBtn = document.getElementById('dict-import');
 const dictImportFile = document.getElementById('dict-import-file');
 
 // Ricerca
-let dictSearchInput = document.getElementById('dict-search-input');
-if (!dictSearchInput) {
-	dictSearchInput = document.createElement('input');
-	dictSearchInput.type = 'text';
-	dictSearchInput.id = 'dict-search-input';
-	dictSearchInput.placeholder = 'Cerca hanzi, pinyin o traduzione';
-	dictSearchInput.style.marginBottom = '0.7rem';
-	dictInput.parentNode.parentNode.insertBefore(dictSearchInput, dictInput.parentNode.nextSibling);
-}
+const dictSearchInput = document.getElementById('dict-search-input');
+
+// Cancella tutti i caratteri
+const dictClearBtn = document.getElementById('dict-clear');
+dictClearBtn.onclick = async () => {
+	if (confirm('Vuoi cancellare tutti i caratteri dal dizionario?')) {
+		const tx = db.transaction(DB_STORE, 'readwrite');
+		const store = tx.objectStore(DB_STORE);
+		const clearReq = store.clear();
+		clearReq.onsuccess = () => loadDict();
+		clearReq.onerror = () => alert('Errore durante la cancellazione');
+	}
+};
 
 function fakePinyin(word) {
-	return word.split('').map(() => 'pīn-yīn').join(' ');
+	// Genera pinyin dimostrativo semplice
+	return word.split('').map(() => 'pīn yīn').join(' ');
 }
 function fakeTranslation(word) {
-	return 'Fake translation for "' + word + '"';
+	// Genera traduzione dimostrativa semplice
+	return 'Traduzione di ' + word;
 }
 
 let allWordsCache = [];
@@ -201,12 +207,13 @@ dictImportFile.onchange = async e => {
 };
 
 
-// --- Generazione Migliorata ---
+
+// --- Generazione aggiornata ---
 const genTypeRadios = document.getElementsByName('gen-type');
 const genLength = document.getElementById('gen-length');
 const genLengthValue = document.getElementById('gen-length-value');
 const genBtn = document.getElementById('gen-generate');
-const genOutput = document.getElementById('gen-output');
+const genTitle = document.getElementById('gen-title');
 
 genLength.oninput = () => {
 	genLengthValue.textContent = genLength.value;
@@ -229,128 +236,107 @@ function pick(arr) {
 	return arr[randomInt(0, arr.length - 1)];
 }
 
-function joinPinyin(arr) {
-	return arr.map(w => w.pinyin).join(' ');
+function randomTitle(type) {
+	const textTitles = [
+		'Una giornata a scuola',
+		'Il mio animale preferito',
+		'Viaggio in città',
+		'Cosa mangio a colazione',
+		'Un sogno divertente',
+		'La mia famiglia',
+		'Un giorno di pioggia',
+		'Al mercato',
+		'La mia routine',
+		'Un ricordo speciale'
+	];
+	const dialogueTitles = [
+		'Conversazione al ristorante',
+		'Due amici si incontrano',
+		'Comprare un biglietto',
+		'Dialogo in classe',
+		'Chiedere indicazioni',
+		'Al telefono',
+		'In biblioteca',
+		'Al parco',
+		'In viaggio',
+		'Alla stazione'
+	];
+	return type === 'dialogue' ? pick(dialogueTitles) : pick(textTitles);
 }
 
-function joinTranslation(arr) {
-	return arr.map(w => w.translation).join(' ');
-}
-
-function getUsedAndNewWords(used, all) {
-	const usedSet = new Set(used.map(w => w.hanzi));
-	const allSet = new Set(all.map(w => w.hanzi));
-	const usedWords = all.filter(w => usedSet.has(w.hanzi));
-	const newWords = all.filter(w => !usedSet.has(w.hanzi));
-	return { usedWords, newWords };
-}
-
-async function generateContent(words, type, length) {
-	if (!words.length) return { error: 'Aggiungi parole nel dizionario!' };
-	// Usa circa il 95% delle parole
-	let n = Math.max(1, Math.round(words.length * 0.95));
-	let pool = shuffle(words).slice(0, n);
-	let hanziArr = [];
-	let pinyinArr = [];
-	let translationArr = [];
-	let speakers = [];
-	let output = '';
-	if (type === 'text') {
-		while (hanziArr.join('').length < length) {
-			const w = pick(pool);
-			hanziArr.push(w.hanzi);
-			pinyinArr.push(w.pinyin);
-			translationArr.push(w.translation);
-			if (Math.random() > 0.7) hanziArr.push('，');
-		}
-		output = hanziArr.join('').slice(0, length) + '。';
-		return {
-			chinese: output,
-			pinyin: pinyinArr.join(' ').slice(0, length * 3),
-			translation: translationArr.join(' ').slice(0, length * 5),
-			usedWords: pool,
-			newWords: words.filter(w => !pool.some(u => u.hanzi === w.hanzi))
-		};
-	} else {
-		// Dialogo
-		const nSpeakers = randomInt(2, 4);
-		speakers = ['A', 'B', 'C', 'D'].slice(0, nSpeakers);
-		let lines = [];
-		let total = 0;
-		let usedSet = new Set();
-		while (total < length) {
-			const name = pick(speakers);
-			let phraseArr = [];
-			let phrasePinyin = [];
-			let phraseTrans = [];
-			for (let i = 0; i < randomInt(2, 7); i++) {
-				const w = pick(pool);
-				phraseArr.push(w.hanzi);
-				phrasePinyin.push(w.pinyin);
-				phraseTrans.push(w.translation);
-				usedSet.add(w.hanzi);
-			}
-			const phrase = phraseArr.join('');
-			lines.push(`<b>${name}:</b> ${phrase}`);
-			total += phrase.length;
-			hanziArr.push(...phraseArr);
-			pinyinArr.push(...phrasePinyin);
-			translationArr.push(...phraseTrans);
-		}
-		output = lines.join('<br>');
-		// Solo le parole effettivamente usate
-		const usedWords = pool.filter(w => usedSet.has(w.hanzi));
-		return {
-			chinese: hanziArr.join('').slice(0, length) + '。',
-			pinyin: pinyinArr.join(' ').slice(0, length * 3),
-			translation: translationArr.join(' ').slice(0, length * 5),
-			usedWords,
-			newWords: words.filter(w => !usedWords.some(u => u.hanzi === w.hanzi)),
-			output
-		};
+function generateDemoText(words, length) {
+	// Usa parole dal dizionario o caratteri dimostrativi
+	let pool = words.length ? shuffle(words) : [
+		{ hanzi: '我', pinyin: 'wǒ', translation: 'io' },
+		{ hanzi: '喜欢', pinyin: 'xǐ huān', translation: 'piace' },
+		{ hanzi: '学习', pinyin: 'xué xí', translation: 'studiare' },
+		{ hanzi: '中文', pinyin: 'zhōng wén', translation: 'cinese' },
+		{ hanzi: '朋友', pinyin: 'péng yǒu', translation: 'amico' },
+		{ hanzi: '吃饭', pinyin: 'chī fàn', translation: 'mangiare' },
+		{ hanzi: '学校', pinyin: 'xué xiào', translation: 'scuola' },
+		{ hanzi: '老师', pinyin: 'lǎo shī', translation: 'insegnante' }
+	];
+	let out = '';
+	while (out.length < length) {
+		out += pick(pool).hanzi;
+		if (Math.random() > 0.7) out += '，';
 	}
+	return out.slice(0, length) + '。';
+}
+
+function generateDemoDialogue(words, length) {
+	let pool = words.length ? shuffle(words) : [
+		{ hanzi: '你', pinyin: 'nǐ', translation: 'tu' },
+		{ hanzi: '好吗', pinyin: 'hǎo ma', translation: 'come va' },
+		{ hanzi: '谢谢', pinyin: 'xiè xie', translation: 'grazie' },
+		{ hanzi: '再见', pinyin: 'zài jiàn', translation: 'arrivederci' },
+		{ hanzi: '今天', pinyin: 'jīn tiān', translation: 'oggi' },
+		{ hanzi: '天气', pinyin: 'tiān qì', translation: 'tempo (meteo)' },
+		{ hanzi: '很好', pinyin: 'hěn hǎo', translation: 'molto bene' },
+		{ hanzi: '请问', pinyin: 'qǐng wèn', translation: 'scusi' }
+	];
+	const nSpeakers = randomInt(2, 4);
+	const names = ['A', 'B', 'C', 'D'].slice(0, nSpeakers);
+	let lines = [];
+	let total = 0;
+	while (total < length) {
+		const name = pick(names);
+		let phrase = '';
+		for (let i = 0; i < randomInt(2, 7); i++) phrase += pick(pool).hanzi;
+		lines.push(name + ': ' + phrase);
+		total += phrase.length;
+	}
+	return lines.join('\n');
 }
 
 genBtn.onclick = async () => {
 	const type = Array.from(genTypeRadios).find(r => r.checked).value;
 	const length = parseInt(genLength.value, 10);
 	const words = await getAllWords();
-	if (!words.length) {
-		genOutput.innerHTML = '<div style="color:#ff3b30">Aggiungi parole nel dizionario!</div>';
+	if (!words.length && type === 'text') {
+		genTitle.textContent = 'Aggiungi parole nel dizionario!';
+		window.lastGenerated = null;
 		return;
 	}
-	const result = await generateContent(words, type, length);
-	if (result.error) {
-		genOutput.innerHTML = `<div style="color:#ff3b30">${result.error}</div>`;
-		return;
-	}
-	// Mostra output dettagliato
-	let html = '';
-	if (type === 'dialogue' && result.output) {
-		html += `<div style="margin-bottom:0.7rem">${result.output}</div>`;
+	let title = randomTitle(type);
+	let content = '';
+	if (type === 'text') {
+		content = generateDemoText(words, length);
 	} else {
-		html += `<div class="study-text">${result.chinese}</div>`;
+		content = generateDemoDialogue(words, length);
 	}
-	html += `<div class="study-text"><b>Pinyin:</b> <span>${result.pinyin}</span></div>`;
-	html += `<div class="study-text"><b>Traduzione:</b> <span>${result.translation}</span></div>`;
-	html += `<div class="study-text"><b>Parole usate:</b> <span>${result.usedWords.map(w => w.hanzi).join(', ')}</span></div>`;
-	html += `<div class="study-text"><b>Parole nuove:</b> <span>${result.newWords.map(w => w.hanzi).join(', ') || '-'}</span></div>`;
-	genOutput.innerHTML = html;
-	// Salva per Studio
+	genTitle.textContent = title;
 	window.lastGenerated = {
-		chinese: result.chinese,
-		pinyin: result.pinyin,
-		translation: result.translation
+		type,
+		title,
+		content,
+		words: words.length ? words : null
 	};
-	// Aggiorna anche la sezione studio
-	studyChinese.textContent = result.chinese;
-	studyPinyin.classList.add('hidden');
-	studyTranslation.classList.add('hidden');
-	studyExplanation.classList.add('hidden');
 };
 
 
-// --- Studio Migliorato ---
+
+// --- Studio aggiornata ---
 const studyChinese = document.getElementById('study-chinese');
 const studyPinyin = document.getElementById('study-pinyin');
 const studyTranslation = document.getElementById('study-translation');
@@ -359,59 +345,128 @@ const studyShowPinyin = document.getElementById('study-show-pinyin');
 const studyShowTranslation = document.getElementById('study-show-translation');
 const studyExplain = document.getElementById('study-explain');
 
-function loadLastGeneratedToStudy() {
-	const last = window.lastGenerated;
-	if (last && last.chinese) {
-		studyChinese.textContent = last.chinese;
-		studyPinyin.textContent = '';
-		studyTranslation.textContent = '';
-		studyExplanation.textContent = '';
-		studyPinyin.classList.add('hidden');
-		studyTranslation.classList.add('hidden');
-		studyExplanation.classList.add('hidden');
-	} else {
-		studyChinese.textContent = 'Genera un testo nella sezione Generazione.';
-		studyPinyin.textContent = '';
-		studyTranslation.textContent = '';
-		studyExplanation.textContent = '';
-		studyPinyin.classList.add('hidden');
-		studyTranslation.classList.add('hidden');
-		studyExplanation.classList.add('hidden');
+let pinyinVisible = false;
+let translationVisible = false;
+let explanationVisible = false;
+
+function splitWithRefs(text, blockSize = 100) {
+	// Divide testo in blocchi con riferimenti [1], [2], ...
+	let blocks = [];
+	let i = 0;
+	while (i < text.length) {
+		let chunk = text.slice(i, i + blockSize);
+		blocks.push(chunk);
+		i += blockSize;
 	}
+	return blocks.map((b, idx) => ({ text: b, ref: `[${idx + 1}]` }));
 }
 
-// Carica testo quando si entra nella tab Studio
-document.querySelector('[data-tab="study"]').addEventListener('click', loadLastGeneratedToStudy);
+function renderStudy() {
+	const last = window.lastGenerated;
+	if (!last || !last.content) {
+		studyChinese.textContent = 'Nessun testo generato. Usa la sezione Generazione.';
+		studyPinyin.textContent = '';
+		studyTranslation.textContent = '';
+		studyExplanation.textContent = '';
+		studyPinyin.classList.add('hidden');
+		studyTranslation.classList.add('hidden');
+		studyExplanation.classList.add('hidden');
+		return;
+	}
+	// Testo unico
+	if (last.type === 'text') {
+		const blocks = splitWithRefs(last.content);
+		studyChinese.innerHTML = blocks.map(b => `<div>${b.text} <span style='color:#bbb'>${b.ref}</span></div>`).join('');
+		// Pinyin
+		if (pinyinVisible) {
+			studyPinyin.innerHTML = blocks.map(b => `<div>${fakePinyin(b.text)} <span style='color:#bbb'>${b.ref}</span></div>`).join('');
+			studyPinyin.classList.remove('hidden');
+		} else {
+			studyPinyin.classList.add('hidden');
+		}
+		// Traduzione
+		if (translationVisible) {
+			studyTranslation.innerHTML = blocks.map(b => `<div>${fakeTranslation(b.text)} <span style='color:#bbb'>${b.ref}</span></div>`).join('');
+			studyTranslation.classList.remove('hidden');
+			studyExplanation.classList.add('hidden');
+		} else {
+			studyTranslation.classList.add('hidden');
+		}
+		// Spiegazione
+		if (explanationVisible) {
+			studyExplanation.innerHTML = blocks.map(b => `<div>Spiegazione di: ${b.text} <span style='color:#bbb'>${b.ref}</span></div>`).join('');
+			studyExplanation.classList.remove('hidden');
+			studyTranslation.classList.add('hidden');
+		} else {
+			studyExplanation.classList.add('hidden');
+		}
+	} else {
+		// Dialogo
+		const lines = last.content.split('\n');
+		studyChinese.innerHTML = lines.map((line, idx) => {
+			const [speaker, ...phraseArr] = line.split(':');
+			const phrase = phraseArr.join(':').trim();
+			return `<div><b>${speaker}:</b> ${phrase} <span style='color:#bbb'>[${idx + 1}]</span></div>`;
+		}).join('');
+		// Pinyin
+		if (pinyinVisible) {
+			studyPinyin.innerHTML = lines.map((line, idx) => {
+				const [speaker, ...phraseArr] = line.split(':');
+				const phrase = phraseArr.join(':').trim();
+				return `<div><b>${speaker}:</b> ${fakePinyin(phrase)} <span style='color:#bbb'>[${idx + 1}]</span></div>`;
+			}).join('');
+			studyPinyin.classList.remove('hidden');
+		} else {
+			studyPinyin.classList.add('hidden');
+		}
+		// Traduzione
+		if (translationVisible) {
+			studyTranslation.innerHTML = lines.map((line, idx) => {
+				const [speaker, ...phraseArr] = line.split(':');
+				const phrase = phraseArr.join(':').trim();
+				return `<div><b>${speaker}:</b> ${fakeTranslation(phrase)} <span style='color:#bbb'>[${idx + 1}]</span></div>`;
+			}).join('');
+			studyTranslation.classList.remove('hidden');
+			studyExplanation.classList.add('hidden');
+		} else {
+			studyTranslation.classList.add('hidden');
+		}
+		// Spiegazione
+		if (explanationVisible) {
+			studyExplanation.innerHTML = lines.map((line, idx) => {
+				const [speaker, ...phraseArr] = line.split(':');
+				const phrase = phraseArr.join(':').trim();
+				return `<div><b>${speaker}:</b> Spiegazione di: ${phrase} <span style='color:#bbb'>[${idx + 1}]</span></div>`;
+			}).join('');
+			studyExplanation.classList.remove('hidden');
+			studyTranslation.classList.add('hidden');
+		} else {
+			studyExplanation.classList.add('hidden');
+		}
+	}
+	// Aggiorna pulsante pinyin
+	studyShowPinyin.textContent = pinyinVisible ? 'Nascondi pinyin' : 'Mostra pinyin';
+}
+
+document.querySelector('[data-tab="study"]').addEventListener('click', renderStudy);
 
 studyShowPinyin.onclick = () => {
-	const last = window.lastGenerated;
-	if (!last || !last.pinyin) return;
-	studyPinyin.textContent = last.pinyin;
-	studyPinyin.classList.remove('hidden');
+	pinyinVisible = !pinyinVisible;
+	renderStudy();
 };
 studyShowTranslation.onclick = () => {
-	const last = window.lastGenerated;
-	if (!last || !last.translation) return;
-	studyTranslation.textContent = last.translation;
-	studyTranslation.classList.remove('hidden');
+	translationVisible = !translationVisible;
+	if (translationVisible) explanationVisible = false;
+	renderStudy();
 };
 studyExplain.onclick = () => {
-	const last = window.lastGenerated;
-	if (!last || !last.chinese) return;
-	// Spiegazione mock parola per parola
-	const hanziArr = last.chinese.replace(/[，。,.!?]/g, '').split('');
-	let html = '';
-	hanziArr.forEach((h, i) => {
-		if (h.trim()) {
-			html += `<div style="margin-bottom:0.3rem"><b>${h}</b>: Spiegazione mock della parola "${h}"</div>`;
-		}
-	});
-	studyExplanation.innerHTML = html;
-	studyExplanation.classList.remove('hidden');
+	explanationVisible = !explanationVisible;
+	if (explanationVisible) translationVisible = false;
+	renderStudy();
 };
 
 // Carica subito se già generato
-if (window.lastGenerated) loadLastGeneratedToStudy();
+if (window.lastGenerated) renderStudy();
 
 // --- PWA Service Worker ---
 if ('serviceWorker' in navigator) {

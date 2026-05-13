@@ -207,11 +207,14 @@ main {
 	border-radius: 8px;
 	padding: 1rem;
 	margin-bottom: 0.7rem;
-	font-size: 1.2rem;
+	font-size: 1.15rem;
 	box-shadow: 0 1px 4px rgba(0,0,0,0.03);
-	text-align: center;
+	text-align: left;
 	min-height: 2.5rem;
 	word-break: break-word;
+	line-height: 1.6;
+	max-width: 100%;
+	overflow-x: auto;
 }
 .study-actions {
 	display: flex;
@@ -242,5 +245,10 @@ main {
 	}
 	h1 {
 		font-size: 1.3rem;
+		margin-left: 0.3rem;
+	}
+	.study-text {
+		font-size: 1rem;
+		padding: 0.7rem 0.4rem;
 	}
 }

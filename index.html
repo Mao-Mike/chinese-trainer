@@ -22,18 +22,25 @@
 		</nav>
 	</header>
 	<main>
+		<!-- Dizionario -->
 		<section id="dictionary" class="tab-section active">
+			<div class="dict-actions">
+				<button id="dict-add">Aggiungi</button>
+				<button id="dict-import">Importa JSON</button>
+				<button id="dict-export">Esporta JSON</button>
+				<button id="dict-clear">Cancella tutti i caratteri</button>
+				<input type="file" id="dict-import-file" accept="application/json" style="display:none">
+			</div>
 			<div class="input-group">
 				<input type="text" id="dict-input" placeholder="Parola o carattere cinese">
-				<button id="dict-add">Aggiungi</button>
+			</div>
+			<div class="input-group">
+				<input type="text" id="dict-search-input" placeholder="Cerca hanzi, pinyin o traduzione">
 			</div>
 			<ul id="dict-list"></ul>
-			<div class="dict-actions">
-				<button id="dict-export">Esporta JSON</button>
-				<input type="file" id="dict-import-file" accept="application/json" style="display:none">
-				<button id="dict-import">Importa JSON</button>
-			</div>
 		</section>
+
+		<!-- Generazione -->
 		<section id="generation" class="tab-section">
 			<div class="gen-type">
 				<label><input type="radio" name="gen-type" value="text" checked> Testo</label>
@@ -44,16 +51,20 @@
 				<input type="range" id="gen-length" min="0" max="1000" value="100">
 			</div>
 			<button id="gen-generate">Genera</button>
-			<div id="gen-output"></div>
+			<div id="gen-title" class="gen-title"></div>
 		</section>
+
+		<!-- Studio -->
 		<section id="study" class="tab-section">
-			<div id="study-chinese" class="study-text"></div>
 			<div class="study-actions">
 				<button id="study-show-pinyin">Mostra pinyin</button>
-				<button id="study-show-translation">Mostra traduzione</button>
-				<button id="study-explain">Spiega traduzione</button>
 			</div>
+			<div id="study-chinese" class="study-text"></div>
 			<div id="study-pinyin" class="study-text hidden"></div>
+			<div class="study-actions">
+				<button id="study-show-translation">Mostra traduzione</button>
+				<button id="study-explain">Mostra spiegazione</button>
+			</div>
 			<div id="study-translation" class="study-text hidden"></div>
 			<div id="study-explanation" class="study-text hidden"></div>
 		</section>
