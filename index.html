@@ -46,9 +46,13 @@
 				<label><input type="radio" name="gen-type" value="text" checked> Testo</label>
 				<label><input type="radio" name="gen-type" value="dialogue"> Dialogo</label>
 			</div>
-			<div class="gen-slider">
-				<label for="gen-length">Lunghezza: <span id="gen-length-value">100</span></label>
-				<input type="range" id="gen-length" min="0" max="1000" value="100">
+			<div class="gen-topic-group">
+				<label for="gen-topic">Argomento o parola chiave</label>
+				<input type="text" id="gen-topic" placeholder="Lascia vuoto per argomento casuale" autocomplete="off">
+			</div>
+			<div class="gen-slider-group">
+				<label for="gen-length">Lunghezza: <span id="gen-length-value">100</span> caratteri</label>
+				<input type="range" id="gen-length" min="10" max="1000" step="10" value="100">
 			</div>
 			<button id="gen-generate">Genera</button>
 			<div id="gen-title" class="gen-title"></div>

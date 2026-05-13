@@ -209,11 +209,14 @@ dictImportFile.onchange = async e => {
 
 
 // --- Generazione aggiornata ---
+
 const genTypeRadios = document.getElementsByName('gen-type');
 const genLength = document.getElementById('gen-length');
 const genLengthValue = document.getElementById('gen-length-value');
 const genBtn = document.getElementById('gen-generate');
 const genTitle = document.getElementById('gen-title');
+const genTopicInput = document.getElementById('gen-topic');
+
 
 genLength.oninput = () => {
 	genLengthValue.textContent = genLength.value;
@@ -236,7 +239,14 @@ function pick(arr) {
 	return arr[randomInt(0, arr.length - 1)];
 }
 
-function randomTitle(type) {
+function randomTitle(type, topic) {
+	if (topic && topic.trim()) {
+		if (type === 'dialogue') {
+			return `Dialogo su "${topic.trim()}"`;
+		} else {
+			return `Testo su "${topic.trim()}"`;
+		}
+	}
 	const textTitles = [
 		'Una giornata a scuola',
 		'Il mio animale preferito',
@@ -312,6 +322,7 @@ function generateDemoDialogue(words, length) {
 genBtn.onclick = async () => {
 	const type = Array.from(genTypeRadios).find(r => r.checked).value;
 	const length = parseInt(genLength.value, 10);
+	const topic = genTopicInput.value.trim();
 	const words = await getAllWords();
 	if (!words.length && type === 'text') {
 		genTitle.textContent = 'Aggiungi parole nel dizionario!';
@@ -319,7 +330,7 @@ genBtn.onclick = async () => {
 		renderStudy();
 		return;
 	}
-	let title = randomTitle(type);
+	let title = randomTitle(type, topic);
 	let content = '';
 	if (type === 'text') {
 		content = generateDemoText(words, length);
@@ -331,6 +342,7 @@ genBtn.onclick = async () => {
 		type,
 		title,
 		content,
+		topic: topic || '',
 		words: words.length ? words : null
 	};
 	renderStudy();
