@@ -361,6 +361,33 @@ function splitWithRefs(text, blockSize = 100) {
 	return blocks.map((b, idx) => ({ text: b, ref: `[${idx + 1}]` }));
 }
 
+
+// --- Rendering pinyin sopra hanzi ---
+function renderChineseBlock(hanzi, pinyin, showPinyin) {
+	return `<span class="chinese-block">${showPinyin ? `<span class="pinyin">${pinyin}</span>` : ''}<span class="hanzi">${hanzi}</span></span>`;
+}
+
+function renderStudyLine(hanziLine, pinyinLine, showPinyin) {
+	// hanziLine e pinyinLine sono stringhe di pari lunghezza (o gruppi)
+	const hanziArr = hanziLine.split('');
+	const pinyinArr = fakePinyin(hanziLine).split(' ');
+	let blocks = '';
+	for (let i = 0; i < hanziArr.length; i++) {
+		blocks += renderChineseBlock(hanziArr[i], pinyinArr[i] || '', showPinyin);
+	}
+	return `<span class="study-line">${blocks}</span>`;
+}
+
+function renderDialogueLine(speaker, hanziLine, showPinyin) {
+	const hanziArr = hanziLine.split('');
+	const pinyinArr = fakePinyin(hanziLine).split(' ');
+	let blocks = '';
+	for (let i = 0; i < hanziArr.length; i++) {
+		blocks += renderChineseBlock(hanziArr[i], pinyinArr[i] || '', showPinyin);
+	}
+	return `<div class="dialogue-line"><span class="dialogue-speaker">${speaker}:</span><span class="dialogue-content study-line">${blocks}</span></div>`;
+}
+
 function renderStudy() {
 	const last = window.lastGenerated;
 	if (!last || !last.content) {
@@ -376,14 +403,8 @@ function renderStudy() {
 	// Testo unico
 	if (last.type === 'text') {
 		const blocks = splitWithRefs(last.content);
-		studyChinese.innerHTML = blocks.map(b => `<div>${b.text} <span style='color:#bbb'>${b.ref}</span></div>`).join('');
-		// Pinyin
-		if (pinyinVisible) {
-			studyPinyin.innerHTML = blocks.map(b => `<div>${fakePinyin(b.text)} <span style='color:#bbb'>${b.ref}</span></div>`).join('');
-			studyPinyin.classList.remove('hidden');
-		} else {
-			studyPinyin.classList.add('hidden');
-		}
+		studyChinese.innerHTML = blocks.map(b => renderStudyLine(b.text, fakePinyin(b.text), pinyinVisible) + `<span style='color:#bbb;margin-left:0.5em'>${b.ref}</span>`).join('');
+		studyPinyin.classList.add('hidden');
 		// Traduzione
 		if (translationVisible) {
 			studyTranslation.innerHTML = blocks.map(b => `<div>${fakeTranslation(b.text)} <span style='color:#bbb'>${b.ref}</span></div>`).join('');
@@ -406,25 +427,15 @@ function renderStudy() {
 		studyChinese.innerHTML = lines.map((line, idx) => {
 			const [speaker, ...phraseArr] = line.split(':');
 			const phrase = phraseArr.join(':').trim();
-			return `<div><b>${speaker}:</b> ${phrase} <span style='color:#bbb'>[${idx + 1}]</span></div>`;
+			return renderDialogueLine(speaker, phrase, pinyinVisible) + `<span style='color:#bbb;margin-left:0.5em'>[${idx + 1}]</span>`;
 		}).join('');
-		// Pinyin
-		if (pinyinVisible) {
-			studyPinyin.innerHTML = lines.map((line, idx) => {
-				const [speaker, ...phraseArr] = line.split(':');
-				const phrase = phraseArr.join(':').trim();
-				return `<div><b>${speaker}:</b> ${fakePinyin(phrase)} <span style='color:#bbb'>[${idx + 1}]</span></div>`;
-			}).join('');
-			studyPinyin.classList.remove('hidden');
-		} else {
-			studyPinyin.classList.add('hidden');
-		}
+		studyPinyin.classList.add('hidden');
 		// Traduzione
 		if (translationVisible) {
 			studyTranslation.innerHTML = lines.map((line, idx) => {
 				const [speaker, ...phraseArr] = line.split(':');
 				const phrase = phraseArr.join(':').trim();
-				return `<div><b>${speaker}:</b> ${fakeTranslation(phrase)} <span style='color:#bbb'>[${idx + 1}]</span></div>`;
+				return `<div class="dialogue-line"><span class="dialogue-speaker">${speaker}:</span><span class="dialogue-content">${fakeTranslation(phrase)}</span><span style='color:#bbb;margin-left:0.5em'>[${idx + 1}]</span></div>`;
 			}).join('');
 			studyTranslation.classList.remove('hidden');
 			studyExplanation.classList.add('hidden');
@@ -436,7 +447,7 @@ function renderStudy() {
 			studyExplanation.innerHTML = lines.map((line, idx) => {
 				const [speaker, ...phraseArr] = line.split(':');
 				const phrase = phraseArr.join(':').trim();
-				return `<div><b>${speaker}:</b> Spiegazione di: ${phrase} <span style='color:#bbb'>[${idx + 1}]</span></div>`;
+				return `<div class="dialogue-line"><span class="dialogue-speaker">${speaker}:</span><span class="dialogue-content">Spiegazione di: ${phrase}</span><span style='color:#bbb;margin-left:0.5em'>[${idx + 1}]</span></div>`;
 			}).join('');
 			studyExplanation.classList.remove('hidden');
 			studyTranslation.classList.add('hidden');
