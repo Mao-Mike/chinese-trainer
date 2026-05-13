@@ -316,6 +316,7 @@ genBtn.onclick = async () => {
 	if (!words.length && type === 'text') {
 		genTitle.textContent = 'Aggiungi parole nel dizionario!';
 		window.lastGenerated = null;
+		renderStudy();
 		return;
 	}
 	let title = randomTitle(type);
@@ -332,6 +333,7 @@ genBtn.onclick = async () => {
 		content,
 		words: words.length ? words : null
 	};
+	renderStudy();
 };
 
 
