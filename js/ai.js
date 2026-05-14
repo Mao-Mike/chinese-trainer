@@ -384,9 +384,9 @@ ${JSON.stringify({ type, topic, targetLength }, null, 2)}`;
 }
 
 export async function explainContentWithAI(content) {
-	const prompt = `You are a Chinese language teacher.
+	const prompt = `You are a concise Chinese grammar teacher.
 
-Improve the explanations for this generated Chinese learning content.
+Explain the generated Chinese content by grouping characters into meaningful word groups.
 
 Return ONLY valid JSON:
 {
@@ -399,11 +399,34 @@ Return ONLY valid JSON:
 }
 
 Rules:
-- Explanation must be in English
-- Explain characters, words, grammar and natural meaning
-- Keep the same refs
-- No markdown
-- No text outside JSON
+- Write in English.
+- Be concise but clear.
+- Do not add final summaries.
+- Do not propose alternatives.
+- Do not add exercises.
+- Do not add learning suggestions.
+- Do not repeat the full translation.
+- Do not explain every single character unless necessary.
+- Group characters into meaningful units.
+- For each relevant group, explain:
+  1. meaning;
+  2. grammatical function;
+  3. syntactic role in the sentence.
+- Focus only on the provided text.
+- Keep the same refs.
+- No markdown.
+- No text outside JSON.
+
+Preferred explanation style:
+"我 = subject, 'I'. 想吃 = verb phrase, 'want to eat'. 米饭 = object, 'rice'. 了 = aspect particle, marks completion or changed state."
+
+Bad explanation style:
+- long paragraphs
+- final summaries
+- alternative sentences
+- extra suggestions
+- exercises
+- generic cultural notes not needed for the sentence
 
 Content:
 ${JSON.stringify(content ?? {}, null, 2)}`;
@@ -418,7 +441,6 @@ ${JSON.stringify(content ?? {}, null, 2)}`;
 			const ref = typeof block?.ref === 'string' && block.ref.trim()
 				? block.ref.trim()
 				: refs[index] || `[${index + 1}]`;
-
 			return {
 				ref,
 				explanation: typeof block?.explanation === 'string' ? block.explanation : ''

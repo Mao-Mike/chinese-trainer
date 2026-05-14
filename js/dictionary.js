@@ -164,18 +164,31 @@ export function initDictionary() {
 	dictAddBtn.onclick = async () => {
 		const hanzi = dictInput.value.trim();
 		if (!hanzi) return;
-
-		if (!pendingWord || pendingWord.hanzi !== hanzi) {
-			setStatus('Prima trova il pinyin.', 'error-message');
+		if (!hasGeminiApiKey()) {
+			setStatus('Inserisci la Gemini API key nelle Impostazioni.', 'error-message');
 			return;
 		}
-
 		const originalLabel = dictAddBtn.textContent;
 		dictAddBtn.disabled = true;
-		dictAddBtn.textContent = 'Salvo...';
-
+		dictAddBtn.textContent = 'Cerco...';
+		let wordToSave = null;
 		try {
-			await addWord(pendingWord.hanzi, pendingWord.pinyin);
+			if (pendingWord && pendingWord.hanzi === hanzi) {
+				wordToSave = pendingWord;
+			} else {
+				setStatus('Cerco pinyin...', 'loading');
+				const enriched = await enrichWordWithAI(hanzi);
+				const pinyin = typeof enriched.pinyin === 'string' ? enriched.pinyin.trim() : '';
+				if (!pinyin) throw new Error('empty_pinyin');
+				wordToSave = {
+					hanzi: typeof enriched.hanzi === 'string' && enriched.hanzi.trim() ? enriched.hanzi.trim() : hanzi,
+					pinyin,
+					createdAt: Date.now()
+				};
+				pendingWord = wordToSave;
+				setPreview(`Pinyin: ${wordToSave.pinyin}`);
+			}
+			await addWord(wordToSave.hanzi, wordToSave.pinyin);
 			dictInput.value = '';
 			clearPendingWord();
 			setStatus('Parola salvata nel dizionario.', 'success-message');
@@ -184,8 +197,8 @@ export function initDictionary() {
 			if (error && error.message === 'Duplicato') {
 				setStatus('Questa parola esiste già!', 'error-message');
 			} else {
+				setStatus('Non riesco a trovare il pinyin. Controlla API key o connessione.', 'error-message');
 				console.error(error);
-				setStatus('Errore durante il salvataggio della parola.', 'error-message');
 			}
 		} finally {
 			dictAddBtn.disabled = false;

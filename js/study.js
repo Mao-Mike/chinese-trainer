@@ -1,5 +1,5 @@
 import { explainContentWithAI } from './ai.js';
-import { loadLastGenerated, saveLastGenerated } from './storage.js';
+import { getAllWords, saveLastGenerated, loadLastGenerated } from './storage.js';
 import { escapeHTML, fakeTranslation, isValidGeneratedContent, normalizeGeneratedContent } from './utils.js';
 
 export function initStudy() {
@@ -218,8 +218,48 @@ export function initStudy() {
 		}
 	}
 
-	studyShowPinyin.onclick = () => {
-		pinyinVisible = !pinyinVisible;
+	// Arricchisce i token con il pinyin dal dizionario locale
+	async function enrichTokensWithLocalDictionary(content) {
+		if (!content || !Array.isArray(content.blocks)) return content;
+		const allWords = await getAllWords();
+		const hanziToPinyin = new Map();
+		for (const w of allWords) {
+			if (w.hanzi && w.pinyin) hanziToPinyin.set(w.hanzi, w.pinyin);
+		}
+		const updatedBlocks = content.blocks.map(block => {
+			const updatedTokens = block.tokens.map(token => {
+				if (token.pinyin && token.pinyin.trim()) return token;
+				// Prova match esatto
+				if (token.hanzi && hanziToPinyin.has(token.hanzi)) {
+					return { ...token, pinyin: hanziToPinyin.get(token.hanzi) };
+				}
+				// Fallback carattere per carattere
+				if (token.hanzi && token.hanzi.length > 1) {
+					const chars = Array.from(token.hanzi);
+					const pinyinArr = chars.map(c => hanziToPinyin.get(c) || '');
+					if (pinyinArr.every(p => p)) {
+						return { ...token, pinyin: pinyinArr.join(' ') };
+					}
+				}
+				return token;
+			});
+			return { ...block, tokens: updatedTokens };
+		});
+		const updatedContent = { ...content, blocks: updatedBlocks };
+		return updatedContent;
+	}
+
+	studyShowPinyin.onclick = async () => {
+		if (!currentContent || !isValidGeneratedContent(currentContent)) return;
+		if (!pinyinVisible) {
+			// Attiva pinyin: aggiorna i token solo localmente
+			const enriched = await enrichTokensWithLocalDictionary(currentContent);
+			currentContent = enriched;
+			saveLastGenerated(enriched);
+			pinyinVisible = true;
+		} else {
+			pinyinVisible = false;
+		}
 		renderStudy();
 	};
 
