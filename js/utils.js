@@ -1,4 +1,4 @@
-export function randomInt(a, b) {
+﻿export function randomInt(a, b) {
 	return Math.floor(Math.random() * (b - a + 1)) + a;
 }
 
@@ -64,39 +64,13 @@ function normalizeToken(token, fallbackHanzi = '') {
 	};
 }
 
-function normalizeBlock(block, index, type) {
-	const chinese = block && typeof block.chinese === 'string' ? block.chinese : '';
-	const rawTokens = Array.isArray(block && block.tokens) && block.tokens.length
-		? block.tokens
-		: Array.from(chinese);
-
-	return {
-		ref: typeof (block && block.ref) === 'string' ? block.ref : `[${index + 1}]`,
-		speaker: type === 'text'
-			? null
-			: (block && typeof block.speaker === 'string' && block.speaker.trim() ? block.speaker : null),
-		chinese,
-		tokens: rawTokens.map((token, tokenIndex) => normalizeToken(token, chinese[tokenIndex] || '')),
-		translation: block && typeof block.translation === 'string' ? block.translation : '',
-		explanation: block && typeof block.explanation === 'string' ? block.explanation : ''
-	};
-}
-
 export function isValidGeneratedContent(content) {
 	return !!content
 		&& (content.type === 'text' || content.type === 'dialogue')
 		&& typeof content.title === 'string'
 		&& Array.isArray(content.blocks)
 		&& content.blocks.length > 0
-		&& content.blocks.every(block => !!block
-			&& typeof block.ref === 'string'
-			&& typeof block.chinese === 'string'
-			&& Array.isArray(block.tokens)
-			&& typeof block.translation === 'string'
-			&& typeof block.explanation === 'string'
-			&& block.tokens.every(token => !!token
-				&& typeof token.hanzi === 'string'
-				&& typeof token.pinyin === 'string'));
+		&& content.blocks.every(block => !!block && typeof block.chinese === 'string');
 }
 
 export function normalizeGeneratedContent(content) {
@@ -106,6 +80,27 @@ export function normalizeGeneratedContent(content) {
 
 	const type = content.type === 'dialogue' ? 'dialogue' : 'text';
 	const blocks = Array.isArray(content.blocks) ? content.blocks : [];
+	if (typeof content.title !== 'string' || !blocks.length || !blocks.every(block => block && typeof block.chinese === 'string')) {
+		return null;
+	}
+
+	const normalizedBlocks = blocks.map((block, index) => {
+		const ref = typeof block.ref === 'string' && block.ref.trim() ? block.ref.trim() : `[${index + 1}]`;
+		const speaker = type === 'text'
+			? null
+			: (typeof block.speaker === 'string' && /^[ABCD]$/.test(block.speaker.trim())
+				? block.speaker.trim()
+				: ['A', 'B', 'C', 'D'][index % 4]);
+
+		return {
+			ref,
+			speaker,
+			chinese: block.chinese,
+			tokens: Array.isArray(block.tokens) ? block.tokens.slice() : [],
+			translation: typeof block.translation === 'string' ? block.translation : '',
+			explanation: typeof block.explanation === 'string' ? block.explanation : ''
+		};
+	});
 
 	return {
 		id: typeof content.id === 'string' ? content.id : makeId(),
@@ -114,9 +109,12 @@ export function normalizeGeneratedContent(content) {
 		title: typeof content.title === 'string' ? content.title : '',
 		topic: typeof content.topic === 'string' ? content.topic : '',
 		targetLength: typeof content.targetLength === 'number' ? content.targetLength : 0,
-		blocks: blocks.map((block, index) => normalizeBlock(block, index, type)),
-		usedWords: Array.isArray(content.usedWords) ? content.usedWords : [],
-		newWords: Array.isArray(content.newWords) ? content.newWords : [],
+		blocks: normalizedBlocks,
+		usedWords: Array.isArray(content.usedWords) ? content.usedWords.slice() : [],
+		newWords: Array.isArray(content.newWords) ? content.newWords.slice() : [],
+		pinyinGenerated: !!content.pinyinGenerated,
+		translationGenerated: !!content.translationGenerated,
 		explanationGenerated: !!content.explanationGenerated
 	};
 }
+

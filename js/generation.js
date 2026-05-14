@@ -1,4 +1,4 @@
-import { generateContentWithAI } from './ai.js';
+﻿import { generateContentWithAI } from './ai.js';
 import { getAllWords, saveLastGenerated } from './storage.js';
 
 function setStatusState(element, state) {
@@ -6,6 +6,29 @@ function setStatusState(element, state) {
 	if (state) {
 		element.classList.add(state);
 	}
+}
+
+function getGenerationErrorMessage(error) {
+	const message = error instanceof Error ? error.message : String(error || '');
+	const normalized = message.toLowerCase();
+
+	if (normalized.includes('api key')) {
+		return 'Inserisci la Gemini API key in Impostazioni.';
+	}
+
+	if (normalized.includes('invalid json')) {
+		return 'La risposta AI non era nel formato atteso. Riprova.';
+	}
+
+	if (normalized.includes('429') || normalized.includes('quota') || normalized.includes('rate')) {
+		return 'Limite temporaneo API raggiunto. Riprova più tardi.';
+	}
+
+	if (normalized.includes('400') || normalized.includes('model')) {
+		return 'Modello Gemini non valido o richiesta non accettata.';
+	}
+
+	return 'Generazione non riuscita. Riprova con un testo più breve.';
 }
 
 export function initGeneration(renderStudy) {
@@ -94,8 +117,8 @@ export function initGeneration(renderStudy) {
 			showSuccess(generated.title);
 			renderStudy();
 		} catch (error) {
-			showError('Errore durante la generazione. Controlla API key, modello o connessione.');
 			console.error(error);
+			showError(getGenerationErrorMessage(error));
 			renderStudy();
 		} finally {
 			genBtn.disabled = false;
@@ -112,3 +135,4 @@ export function initGeneration(renderStudy) {
 		await handleGeneration(lastGenerationRequest);
 	};
 }
+
