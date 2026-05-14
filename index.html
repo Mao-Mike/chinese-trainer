@@ -14,29 +14,34 @@
 </head>
 <body>
 	<header>
-		<h1>Chinese Trainer</h1>
+		<div class="header-top">
+			<h1>Chinese Trainer</h1>
+			<button id="settings-toggle" class="icon-btn" type="button" aria-label="Impostazioni" title="Impostazioni">&#9881;</button>
+		</div>
 		<nav>
 			<button class="tab-btn active" data-tab="dictionary">Dizionario</button>
-			<button class="tab-btn" data-tab="generation">Generazione</button>
-			<button class="tab-btn" data-tab="study">Studio</button>
-			<button class="tab-btn" data-tab="settings">Impostazioni</button>
+			<button class="tab-btn" data-tab="generation">Genera</button>
+			<button class="tab-btn" data-tab="study">Esercizio</button>
 		</nav>
 	</header>
 	<main>
 		<!-- Dizionario -->
 		<section id="dictionary" class="tab-section active">
-			<div class="dict-actions">
+			<div class="dict-entry-row">
+				<input type="text" id="dict-input" placeholder="Inserisci carattere o parola cinese">
+				<button id="dict-find-pinyin">Trova pinyin</button>
 				<button id="dict-add">Aggiungi</button>
-				<button id="dict-import">Importa JSON</button>
-				<button id="dict-export">Esporta JSON</button>
+			</div>
+			<div id="dict-preview" class="dict-preview">Pinyin non ancora disponibile</div>
+			<div id="dict-status" class="dict-status"></div>
+			<div class="dict-actions">
+				<button id="dict-import">Importa dizionario</button>
+				<button id="dict-export">Esporta dizionario</button>
 				<button id="dict-clear">Cancella tutti i caratteri</button>
 				<input type="file" id="dict-import-file" accept="application/json" style="display:none">
 			</div>
 			<div class="input-group">
-				<input type="text" id="dict-input" placeholder="Parola o carattere cinese">
-			</div>
-			<div class="input-group">
-				<input type="text" id="dict-search-input" placeholder="Cerca hanzi, pinyin o traduzione">
+				<input type="text" id="dict-search-input" placeholder="Cerca nel dizionario">
 			</div>
 			<ul id="dict-list"></ul>
 		</section>

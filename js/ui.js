@@ -1,21 +1,35 @@
 export function initTabs(onStudyTabActivate) {
 	const tabButtons = document.querySelectorAll('.tab-btn');
 	const tabSections = document.querySelectorAll('.tab-section');
+	const settingsToggle = document.getElementById('settings-toggle');
+
+	function activateTab(tabId) {
+		tabButtons.forEach(button => button.classList.toggle('active', button.dataset.tab === tabId));
+		tabSections.forEach(section => section.classList.toggle('active', section.id === tabId));
+
+		if (settingsToggle) {
+			settingsToggle.classList.toggle('active', tabId === 'settings');
+			settingsToggle.setAttribute('aria-pressed', tabId === 'settings' ? 'true' : 'false');
+		}
+
+		if (tabId === 'study' && typeof onStudyTabActivate === 'function') {
+			onStudyTabActivate();
+		}
+	}
 
 	tabButtons.forEach(btn => {
 		btn.addEventListener('click', () => {
-			tabButtons.forEach(button => button.classList.remove('active'));
-			btn.classList.add('active');
-
-			tabSections.forEach(section => section.classList.remove('active'));
-			const target = document.getElementById(btn.dataset.tab);
-			if (target) {
-				target.classList.add('active');
-			}
-
-			if (btn.dataset.tab === 'study' && typeof onStudyTabActivate === 'function') {
-				onStudyTabActivate();
-			}
+			activateTab(btn.dataset.tab);
 		});
 	});
+
+	if (settingsToggle) {
+		settingsToggle.addEventListener('click', () => {
+			activateTab('settings');
+		});
+	}
+
+	return {
+		activateTab
+	};
 }

@@ -3,24 +3,56 @@ import { addWord, clearDatabase, deleteWordById, getAllWords, importWords } from
 
 export function initDictionary() {
 	const dictInput = document.getElementById('dict-input');
+	const dictFindBtn = document.getElementById('dict-find-pinyin');
 	const dictAddBtn = document.getElementById('dict-add');
 	const dictList = document.getElementById('dict-list');
 	const dictExportBtn = document.getElementById('dict-export');
 	const dictImportBtn = document.getElementById('dict-import');
 	const dictImportFile = document.getElementById('dict-import-file');
 	const dictClearBtn = document.getElementById('dict-clear');
-
-	let dictSearchInput = document.getElementById('dict-search-input');
-	if (!dictSearchInput) {
-		dictSearchInput = document.createElement('input');
-		dictSearchInput.type = 'text';
-		dictSearchInput.id = 'dict-search-input';
-		dictSearchInput.placeholder = 'Cerca hanzi, pinyin o traduzione';
-		dictSearchInput.style.marginBottom = '0.7rem';
-		dictInput.parentNode.parentNode.insertBefore(dictSearchInput, dictInput.parentNode.nextSibling);
-	}
+	const dictPreview = document.getElementById('dict-preview');
+	const dictStatus = document.getElementById('dict-status');
+	const dictSearchInput = document.getElementById('dict-search-input');
 
 	let allWordsCache = [];
+	let pendingWord = null;
+	let lookupToken = 0;
+
+	function setPreview(text) {
+		dictPreview.textContent = text;
+	}
+
+	function setStatus(message = '', state = '') {
+		dictStatus.textContent = message;
+		dictStatus.className = state ? `dict-status ${state}` : 'dict-status';
+	}
+
+	function hasGeminiApiKey() {
+		try {
+			if (typeof localStorage === 'undefined') {
+				return false;
+			}
+
+			const value = localStorage.getItem('geminiApiKey') || localStorage.geminiApiKey || '';
+			return typeof value === 'string' && value.trim().length > 0;
+		} catch {
+			return false;
+		}
+	}
+
+	function normalizeStoredWord(word) {
+		return {
+			hanzi: word.hanzi || '',
+			pinyin: word.pinyin || '',
+			createdAt: typeof word.createdAt === 'number' ? word.createdAt : Date.now()
+		};
+	}
+
+	function clearPendingWord() {
+		lookupToken += 1;
+		pendingWord = null;
+		setPreview('Pinyin non ancora disponibile');
+	}
 
 	function renderDictList(words) {
 		dictList.innerHTML = '';
@@ -29,17 +61,15 @@ export function initDictionary() {
 			const li = document.createElement('li');
 			const wordDiv = document.createElement('div');
 			wordDiv.className = 'dict-word';
+
 			const hanziSpan = document.createElement('span');
 			hanziSpan.textContent = word.hanzi;
+			wordDiv.appendChild(hanziSpan);
+
 			const pinyinSpan = document.createElement('span');
 			pinyinSpan.className = 'dict-pinyin';
-			pinyinSpan.textContent = word.pinyin;
-			const translationSpan = document.createElement('span');
-			translationSpan.className = 'dict-translation';
-			translationSpan.textContent = word.translation;
-			wordDiv.appendChild(hanziSpan);
+			pinyinSpan.textContent = word.pinyin || '';
 			wordDiv.appendChild(pinyinSpan);
-			wordDiv.appendChild(translationSpan);
 
 			const delBtn = document.createElement('button');
 			delBtn.className = 'dict-delete';
@@ -68,68 +98,104 @@ export function initDictionary() {
 
 		if (q) {
 			filtered = allWordsCache.filter(word =>
-				(word.hanzi && word.hanzi.includes(q)) ||
-				(word.pinyin && word.pinyin.toLowerCase().includes(q)) ||
-				(word.translation && word.translation.toLowerCase().includes(q))
+				(word.hanzi && word.hanzi.toLowerCase().includes(q)) ||
+				(word.pinyin && word.pinyin.toLowerCase().includes(q))
 			);
 		}
 
 		renderDictList(filtered);
 	}
 
-	dictSearchInput.addEventListener('input', filterAndRenderDict);
+	async function findPinyin() {
+		const hanzi = dictInput.value.trim();
+		if (!hanzi) return;
 
-	function hasGeminiApiKey() {
+		if (!hasGeminiApiKey()) {
+			setStatus('Inserisci la Gemini API key nelle Impostazioni.', 'error-message');
+			return;
+		}
+
+		const requestId = ++lookupToken;
+		const originalLabel = dictFindBtn.textContent;
+		dictFindBtn.disabled = true;
+		dictFindBtn.textContent = 'Cerco...';
+		setStatus('Cerco pinyin...', 'loading');
+
 		try {
-			if (typeof localStorage === 'undefined') {
-				return false;
+			const enriched = await enrichWordWithAI(hanzi);
+			if (requestId !== lookupToken) {
+				return;
 			}
 
-			const value = localStorage.getItem('geminiApiKey') || localStorage.geminiApiKey || '';
-			return typeof value === 'string' && value.trim().length > 0;
-		} catch {
-			return false;
+			const pinyin = typeof enriched.pinyin === 'string' ? enriched.pinyin.trim() : '';
+			if (!pinyin) {
+				throw new Error('empty_pinyin');
+			}
+
+			pendingWord = {
+				hanzi: typeof enriched.hanzi === 'string' && enriched.hanzi.trim() ? enriched.hanzi.trim() : hanzi,
+				pinyin,
+				createdAt: Date.now()
+			};
+			setPreview(`Pinyin: ${pendingWord.pinyin}`);
+			setStatus('Pinyin trovato.', 'success-message');
+		} catch (error) {
+			if (requestId !== lookupToken) {
+				return;
+			}
+
+			pendingWord = null;
+			setPreview('Pinyin non ancora disponibile');
+			setStatus('Non riesco a trovare il pinyin. Controlla API key o connessione.', 'error-message');
+			console.error(error);
+		} finally {
+			dictFindBtn.disabled = false;
+			dictFindBtn.textContent = originalLabel;
 		}
 	}
+
+	dictInput.addEventListener('input', () => {
+		clearPendingWord();
+		setStatus('');
+	});
+
+	dictFindBtn.onclick = findPinyin;
 
 	dictAddBtn.onclick = async () => {
 		const hanzi = dictInput.value.trim();
 		if (!hanzi) return;
 
-		if (!hasGeminiApiKey()) {
-			alert('Inserisci la Gemini API key in Impostazioni.');
+		if (!pendingWord || pendingWord.hanzi !== hanzi) {
+			setStatus('Prima trova il pinyin.', 'error-message');
 			return;
 		}
 
 		const originalLabel = dictAddBtn.textContent;
 		dictAddBtn.disabled = true;
-		dictAddBtn.textContent = 'Cerco...';
+		dictAddBtn.textContent = 'Salvo...';
 
 		try {
-			const enriched = await enrichWordWithAI(hanzi);
-			await addWord(
-				typeof enriched.hanzi === 'string' && enriched.hanzi.trim() ? enriched.hanzi.trim() : hanzi,
-				typeof enriched.pinyin === 'string' ? enriched.pinyin : '',
-				typeof enriched.translation === 'string' ? enriched.translation : ''
-			);
+			await addWord(pendingWord.hanzi, pendingWord.pinyin);
 			dictInput.value = '';
+			clearPendingWord();
+			setStatus('Parola salvata nel dizionario.', 'success-message');
 			await loadDict();
 		} catch (error) {
 			if (error && error.message === 'Duplicato') {
-				alert('Questa parola esiste già!');
+				setStatus('Questa parola esiste già!', 'error-message');
 			} else {
 				console.error(error);
-				alert('Errore durante il recupero di pinyin/traduzione.');
+				setStatus('Errore durante il salvataggio della parola.', 'error-message');
 			}
 		} finally {
 			dictAddBtn.disabled = false;
-			dictAddBtn.textContent = 'Aggiungi';
+			dictAddBtn.textContent = originalLabel;
 		}
 	};
 
 	dictExportBtn.onclick = async () => {
 		const words = await getAllWords();
-		const exportWords = words.map(({ id, ...rest }) => rest);
+		const exportWords = words.map(normalizeStoredWord);
 		const blob = new Blob([JSON.stringify(exportWords, null, 2)], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
@@ -147,11 +213,10 @@ export function initDictionary() {
 		const text = await file.text();
 		try {
 			let words = JSON.parse(text);
-			words = words.map(word => ({
+			words = words.map(word => normalizeStoredWord({
 				hanzi: word.hanzi || word.word || '',
 				pinyin: word.pinyin || '',
-				translation: word.translation || '',
-				createdAt: word.createdAt || Date.now()
+				createdAt: typeof word.createdAt === 'number' ? word.createdAt : Date.now()
 			})).filter(word => word.hanzi);
 
 			await importWords(words);

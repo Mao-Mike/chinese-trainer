@@ -10,10 +10,10 @@ async function bootstrap() {
 		await openDB();
 
 		const study = initStudy();
-		initTabs(study.renderStudy);
+		const tabs = initTabs(study.renderStudy);
 		initDictionary();
 		initGeneration(study.renderStudy);
-		initSettings(); // Inizializza la sezione Impostazioni
+		initSettings(tabs.activateTab);
 
 		if ('serviceWorker' in navigator) {
 			window.addEventListener('load', () => {

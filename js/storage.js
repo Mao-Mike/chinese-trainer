@@ -51,14 +51,18 @@ export async function findWordByHanzi(hanzi) {
 	return words.find(word => word.hanzi === hanzi);
 }
 
-export async function addWord(hanzi, pinyin, translation) {
+async function insertWordRecord(record) {
+	return withStore('readwrite', store => store.add(record));
+}
+
+export async function addWord(hanzi, pinyin) {
 	const exists = await findWordByHanzi(hanzi);
 	if (exists) {
 		throw new Error('Duplicato');
 	}
 
 	const createdAt = Date.now();
-	return withStore('readwrite', store => store.add({ hanzi, pinyin, translation, createdAt }));
+	return insertWordRecord({ hanzi, pinyin, createdAt });
 }
 
 export function deleteWordById(id) {
@@ -68,10 +72,16 @@ export function deleteWordById(id) {
 export async function importWords(words) {
 	const existing = await getAllWords();
 	const hanziSet = new Set(existing.map(word => word.hanzi));
-	const toAdd = words.filter(word => word.hanzi && !hanziSet.has(word.hanzi));
-
-	for (const word of toAdd) {
-		await addWord(word.hanzi, word.pinyin, word.translation);
+	for (const word of words) {
+		if (!word.hanzi || hanziSet.has(word.hanzi)) {
+			continue;
+		}
+		await insertWordRecord({
+			hanzi: word.hanzi,
+			pinyin: word.pinyin || '',
+			createdAt: typeof word.createdAt === 'number' ? word.createdAt : Date.now()
+		});
+		hanziSet.add(word.hanzi);
 	}
 }
 

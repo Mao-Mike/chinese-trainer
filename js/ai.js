@@ -272,13 +272,11 @@ Return ONLY valid JSON:
 {
   "hanzi": "...",
   "pinyin": "...",
-  "translation": "...",
   "notes": "..."
 }
 
 Rules:
 - pinyin must use tone marks
-- translation must be in English
 - hanzi must be simplified Chinese if possible
 - no markdown
 - no text outside JSON
@@ -294,7 +292,6 @@ ${String(hanzi ?? '').trim()}`;
 	return {
 		hanzi: typeof result.hanzi === 'string' ? result.hanzi : String(hanzi ?? ''),
 		pinyin: typeof result.pinyin === 'string' ? result.pinyin : '',
-		translation: typeof result.translation === 'string' ? result.translation : '',
 		notes: typeof result.notes === 'string' ? result.notes : ''
 	};
 }

@@ -116,6 +116,7 @@ export function normalizeGeneratedContent(content) {
 		targetLength: typeof content.targetLength === 'number' ? content.targetLength : 0,
 		blocks: blocks.map((block, index) => normalizeBlock(block, index, type)),
 		usedWords: Array.isArray(content.usedWords) ? content.usedWords : [],
-		newWords: Array.isArray(content.newWords) ? content.newWords : []
+		newWords: Array.isArray(content.newWords) ? content.newWords : [],
+		explanationGenerated: !!content.explanationGenerated
 	};
 }
