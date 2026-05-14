@@ -130,31 +130,33 @@ async function callGeminiJSON(prompt, options = {}) {
 		throw new Error(`Gemini request failed (${response.status})`);
 	}
 
-	let data;
+	let responseData;
+	let rawResponse = '';
 	try {
-		data = await response.json();
-	} catch (error) {
-		console.error('Gemini response JSON parse failed', error);
-		throw new Error('Gemini request failed to parse');
+		rawResponse = await response.text();
+		responseData = JSON.parse(rawResponse);
+	} catch {
+		console.error('Gemini returned invalid JSON', rawResponse);
+		throw new Error('Gemini returned invalid JSON');
 	}
 
-	const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+	const text = responseData?.candidates?.[0]?.content?.parts?.[0]?.text;
 	if (typeof text !== 'string' || !text.trim()) {
-		console.error('Gemini returned empty response', data);
+		console.error('Gemini returned empty response', responseData);
 		throw new Error('Gemini returned empty response');
 	}
 
 	return parseGeminiJSON(text);
 }
 
-function normalizeVocabularyWord(word) {
+function normalizeVocabularyWord(word, index) {
 	if (!word) {
 		return null;
 	}
 
 	if (typeof word === 'string') {
 		const hanzi = word.trim();
-		return hanzi ? { hanzi, createdAt: 0 } : null;
+		return hanzi ? { hanzi, createdAt: 0, index } : null;
 	}
 
 	if (typeof word !== 'object') {
@@ -166,8 +168,8 @@ function normalizeVocabularyWord(word) {
 		return null;
 	}
 
-	const createdAt = Number.isFinite(word.createdAt) ? Number(word.createdAt) : 0;
-	return { hanzi, createdAt };
+	const createdAt = Number.isFinite(Number(word.createdAt)) ? Number(word.createdAt) : 0;
+	return { hanzi, createdAt, index };
 }
 
 export function selectHanziVocabulary(words, maxWords = 120) {
@@ -175,10 +177,16 @@ export function selectHanziVocabulary(words, maxWords = 120) {
 		return [];
 	}
 
-	const normalized = words.map(normalizeVocabularyWord).filter(Boolean);
+	const normalized = words
+		.map((word, index) => normalizeVocabularyWord(word, index))
+		.filter(Boolean);
+
 	const hasCreatedAt = normalized.some(item => item.createdAt > 0);
 	const ordered = hasCreatedAt
-		? normalized.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+		? normalized.slice().sort((a, b) => {
+			const timeDiff = (b.createdAt || 0) - (a.createdAt || 0);
+			return timeDiff !== 0 ? timeDiff : a.index - b.index;
+		})
 		: normalized;
 
 	const seen = new Set();
@@ -218,6 +226,24 @@ function mapBlocksWithField(resultBlocks, fallbackRefs, field) {
 		return {
 			ref: blockRef,
 			[field]: typeof resultBlock?.[field] === 'string' ? resultBlock[field] : ''
+		};
+	});
+}
+
+function cleanGeneratedBlocks(blocks) {
+	return blocks.map((block, index) => {
+		const ref = typeof block.ref === 'string' && block.ref.trim() ? block.ref.trim() : `[${index + 1}]`;
+		const speaker = typeof block.speaker === 'string' && /^[ABCD]$/.test(block.speaker.trim())
+			? block.speaker.trim()
+			: null;
+
+		return {
+			ref,
+			speaker,
+			chinese: typeof block.chinese === 'string' ? block.chinese : '',
+			tokens: [],
+			translation: '',
+			explanation: ''
 		};
 	});
 }
@@ -306,19 +332,20 @@ ${JSON.stringify(hanziVocabulary, null, 2)}`;
 	const result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 8192 });
 	const normalized = normalizeGeneratedContent(result);
 
-	if (!normalized || !normalized.blocks.length) {
+	if (!normalized || !Array.isArray(normalized.blocks) || !normalized.blocks.length) {
 		throw new Error('Gemini returned content without blocks.');
 	}
 
+	const cleanedBlocks = cleanGeneratedBlocks(normalized.blocks);
+
 	return {
-		...normalized,
-		id: normalized.id || makeId(),
-		createdAt: normalized.createdAt || Date.now(),
-		type: normalized.type,
-		title: normalized.title,
-		topic: normalized.topic,
-		targetLength: normalized.targetLength || targetLength,
-		blocks: normalized.blocks,
+		id: typeof normalized.id === 'string' && normalized.id.trim() ? normalized.id.trim() : makeId(),
+		createdAt: Number.isFinite(Number(normalized.createdAt)) ? Number(normalized.createdAt) : Date.now(),
+		type: normalized.type === 'dialogue' ? 'dialogue' : 'text',
+		title: typeof normalized.title === 'string' ? normalized.title : '',
+		topic: typeof normalized.topic === 'string' ? normalized.topic : topic,
+		targetLength: Number.isFinite(Number(normalized.targetLength)) ? Number(normalized.targetLength) : targetLength,
+		blocks: cleanedBlocks,
 		usedWords: Array.isArray(normalized.usedWords) ? normalized.usedWords : [],
 		newWords: Array.isArray(normalized.newWords) ? normalized.newWords : [],
 		pinyinGenerated: false,
@@ -360,6 +387,7 @@ ${JSON.stringify(content ?? {}, null, 2)}`;
 	if (!resultBlocks.length) {
 		throw new Error('Gemini returned content without blocks.');
 	}
+
 	const fallbackRefs = buildRefsFromContent(content, resultBlocks.length);
 	const blocks = mapBlocksWithField(resultBlocks, fallbackRefs, 'translation');
 
@@ -398,6 +426,7 @@ ${JSON.stringify(content ?? {}, null, 2)}`;
 	if (!resultBlocks.length) {
 		throw new Error('Gemini returned content without blocks.');
 	}
+
 	const fallbackRefs = buildRefsFromContent(content, resultBlocks.length);
 	const blocks = mapBlocksWithField(resultBlocks, fallbackRefs, 'explanation');
 

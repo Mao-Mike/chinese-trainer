@@ -1,4 +1,4 @@
-﻿export function randomInt(a, b) {
+export function randomInt(a, b) {
 	return Math.floor(Math.random() * (b - a + 1)) + a;
 }
 
@@ -47,10 +47,19 @@ function makeId() {
 	if (typeof crypto !== 'undefined' && crypto.randomUUID) {
 		return crypto.randomUUID();
 	}
+
 	return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function normalizeToken(token, fallbackHanzi = '') {
+	if (typeof token === 'string') {
+		const hanzi = token.trim();
+		return {
+			hanzi: hanzi || fallbackHanzi,
+			pinyin: ''
+		};
+	}
+
 	if (token && typeof token === 'object') {
 		return {
 			hanzi: typeof token.hanzi === 'string' ? token.hanzi : fallbackHanzi,
@@ -80,12 +89,14 @@ export function normalizeGeneratedContent(content) {
 
 	const type = content.type === 'dialogue' ? 'dialogue' : 'text';
 	const blocks = Array.isArray(content.blocks) ? content.blocks : [];
-	if (typeof content.title !== 'string' || !blocks.length || !blocks.every(block => block && typeof block.chinese === 'string')) {
+	if (!blocks.length || !blocks.every(block => block && typeof block.chinese === 'string')) {
 		return null;
 	}
 
 	const normalizedBlocks = blocks.map((block, index) => {
-		const ref = typeof block.ref === 'string' && block.ref.trim() ? block.ref.trim() : `[${index + 1}]`;
+		const ref = typeof block.ref === 'string' && block.ref.trim()
+			? block.ref.trim()
+			: `[${index + 1}]`;
 		const speaker = type === 'text'
 			? null
 			: (typeof block.speaker === 'string' && /^[ABCD]$/.test(block.speaker.trim())
@@ -96,19 +107,19 @@ export function normalizeGeneratedContent(content) {
 			ref,
 			speaker,
 			chinese: block.chinese,
-			tokens: Array.isArray(block.tokens) ? block.tokens.slice() : [],
+			tokens: Array.isArray(block.tokens) ? block.tokens.map(token => normalizeToken(token)) : [],
 			translation: typeof block.translation === 'string' ? block.translation : '',
 			explanation: typeof block.explanation === 'string' ? block.explanation : ''
 		};
 	});
 
 	return {
-		id: typeof content.id === 'string' ? content.id : makeId(),
-		createdAt: typeof content.createdAt === 'number' ? content.createdAt : Date.now(),
+		id: typeof content.id === 'string' && content.id.trim() ? content.id.trim() : makeId(),
+		createdAt: Number.isFinite(Number(content.createdAt)) ? Number(content.createdAt) : Date.now(),
 		type,
 		title: typeof content.title === 'string' ? content.title : '',
 		topic: typeof content.topic === 'string' ? content.topic : '',
-		targetLength: typeof content.targetLength === 'number' ? content.targetLength : 0,
+		targetLength: Number.isFinite(Number(content.targetLength)) ? Number(content.targetLength) : 0,
 		blocks: normalizedBlocks,
 		usedWords: Array.isArray(content.usedWords) ? content.usedWords.slice() : [],
 		newWords: Array.isArray(content.newWords) ? content.newWords.slice() : [],
@@ -117,4 +128,3 @@ export function normalizeGeneratedContent(content) {
 		explanationGenerated: !!content.explanationGenerated
 	};
 }
-
