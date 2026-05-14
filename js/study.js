@@ -1,5 +1,5 @@
-import { explainContentWithAI } from './ai.js';
-import { getAllWords, saveLastGenerated, loadLastGenerated } from './storage.js';
+﻿import { explainContentWithAI } from './ai.js';
+import { loadLastGenerated, saveLastGenerated } from './storage.js';
 import { escapeHTML, fakeTranslation, isValidGeneratedContent, normalizeGeneratedContent } from './utils.js';
 
 export function initStudy() {
@@ -52,49 +52,10 @@ export function initStudy() {
 		return `<div class="dialogue-line"><span class="dialogue-speaker">${speaker}:</span><span class="dialogue-content study-line">${block.tokens.map(token => renderChineseBlock(token, showPinyin)).join('')}</span></div>`;
 	}
 
-	function renderStudyText(normalized) {
-		if (normalized.type === 'text') {
-			studyChinese.innerHTML = normalized.blocks
-				.map(block => `${renderStudyLine(block.tokens, pinyinVisible)} <span class="study-ref">${escapeHTML(block.ref)}</span>`)
-				.join('');
-			return;
-		}
-
-		studyChinese.innerHTML = normalized.blocks
-			.map(block => `${renderDialogueLine(block, pinyinVisible)} <span class="study-ref">${escapeHTML(block.ref)}</span>`)
-			.join('');
-	}
-
-	function renderTranslation(normalized) {
-		const show = translationVisible && !explanationVisible;
-		studyTranslation.innerHTML = normalized.blocks
-			.map(block => normalized.type === 'text'
-				? `<div>${escapeHTML(block.translation || fakeTranslation(block.chinese))} <span class="study-ref">${escapeHTML(block.ref)}</span></div>`
-				: `<div class="dialogue-line"><span class="dialogue-speaker">${escapeHTML(block.speaker || '')}:</span><span class="dialogue-content">${escapeHTML(block.translation || fakeTranslation(block.chinese))}</span><span class="study-ref">${escapeHTML(block.ref)}</span></div>`)
-			.join('');
-		studyTranslation.classList.toggle('hidden', !show);
-	}
-
-	function renderExplanation(normalized) {
-		if (!explanationVisible) {
-			studyExplanation.classList.add('hidden');
-			return;
-		}
-
-		if (!normalized.explanationGenerated && explanationState !== 'ready') {
-			studyExplanation.classList.remove('hidden');
-			return;
-		}
-
-		studyExplanation.innerHTML = normalized.blocks
-			.map(block => normalized.type === 'text'
-				? `<div>${escapeHTML(block.explanation || `Spiegazione di: ${block.chinese}`)} <span class="study-ref">${escapeHTML(block.ref)}</span></div>`
-				: `<div class="dialogue-line"><span class="dialogue-speaker">${escapeHTML(block.speaker || '')}:</span><span class="dialogue-content">${escapeHTML(block.explanation || `Spiegazione di: ${block.chinese}`)}</span><span class="study-ref">${escapeHTML(block.ref)}</span></div>`)
-			.join('');
-		studyExplanation.classList.remove('hidden');
-	}
-
-	function resetPanels() {
+	function setEmptyState() {
+		studyChinese.textContent = 'Testo';
+		studyChinese.classList.add('study-placeholder');
+		setMessageState(studyChinese, 'loading');
 		studyTranslation.textContent = '';
 		studyExplanation.textContent = '';
 		studyTranslation.classList.add('hidden');
@@ -106,33 +67,70 @@ export function initStudy() {
 		currentContent = normalized;
 
 		if (!normalized) {
-			studyChinese.textContent = 'Nessun testo generato. Usa la sezione Genera.';
-			setMessageState(studyChinese, 'error-message');
 			pinyinVisible = false;
 			translationVisible = false;
 			explanationVisible = false;
 			explanationState = 'idle';
-			resetPanels();
+			setEmptyState();
 			studyShowPinyin.textContent = 'Mostra pinyin';
 			return;
 		}
 
 		if (!isValidGeneratedContent(normalized)) {
 			studyChinese.textContent = 'Il contenuto generato non è valido. Genera un nuovo testo.';
+			studyChinese.classList.add('study-placeholder');
 			setMessageState(studyChinese, 'error-message');
 			pinyinVisible = false;
 			translationVisible = false;
 			explanationVisible = false;
 			explanationState = 'idle';
-			resetPanels();
+			studyTranslation.textContent = '';
+			studyExplanation.textContent = '';
+			studyTranslation.classList.add('hidden');
+			studyExplanation.classList.add('hidden');
 			studyShowPinyin.textContent = 'Mostra pinyin';
 			return;
 		}
 
+		studyChinese.classList.remove('study-placeholder');
 		setMessageState(studyChinese, null);
-		renderStudyText(normalized);
-		renderTranslation(normalized);
-		renderExplanation(normalized);
+
+		if (normalized.type === 'text') {
+			studyChinese.innerHTML = normalized.blocks
+				.map(block => `${renderStudyLine(block.tokens, pinyinVisible)} <span class="study-ref">${escapeHTML(block.ref)}</span>`)
+				.join('');
+		} else {
+			studyChinese.innerHTML = normalized.blocks
+				.map(block => `${renderDialogueLine(block, pinyinVisible)} <span class="study-ref">${escapeHTML(block.ref)}</span>`)
+				.join('');
+		}
+
+		if (translationVisible && !explanationVisible) {
+			studyTranslation.innerHTML = normalized.blocks
+				.map(block => normalized.type === 'text'
+					? `<div>${escapeHTML(block.translation || fakeTranslation(block.chinese))} <span class="study-ref">${escapeHTML(block.ref)}</span></div>`
+					: `<div class="dialogue-line"><span class="dialogue-speaker">${escapeHTML(block.speaker || '')}:</span><span class="dialogue-content">${escapeHTML(block.translation || fakeTranslation(block.chinese))}</span><span class="study-ref">${escapeHTML(block.ref)}</span></div>`)
+				.join('');
+			studyTranslation.classList.remove('hidden');
+		} else {
+			studyTranslation.classList.add('hidden');
+		}
+
+		if (explanationVisible) {
+			if (!normalized.explanationGenerated && explanationState !== 'ready' && explanationState !== 'loading' && explanationState !== 'error') {
+				studyExplanation.textContent = '';
+			} else if (normalized.explanationGenerated || explanationState === 'ready') {
+				studyExplanation.innerHTML = normalized.blocks
+					.map(block => normalized.type === 'text'
+						? `<div>${escapeHTML(block.explanation || `Spiegazione di: ${block.chinese}`)} <span class="study-ref">${escapeHTML(block.ref)}</span></div>`
+						: `<div class="dialogue-line"><span class="dialogue-speaker">${escapeHTML(block.speaker || '')}:</span><span class="dialogue-content">${escapeHTML(block.explanation || `Spiegazione di: ${block.chinese}`)}</span><span class="study-ref">${escapeHTML(block.ref)}</span></div>`)
+					.join('');
+			}
+			studyExplanation.classList.remove('hidden');
+		} else {
+			studyExplanation.classList.add('hidden');
+		}
+
 		studyShowPinyin.textContent = pinyinVisible ? 'Nascondi pinyin' : 'Mostra pinyin';
 	}
 
@@ -141,14 +139,8 @@ export function initStudy() {
 			return;
 		}
 
-		if (explanationVisible && currentContent.explanationGenerated) {
-			explanationVisible = false;
-			renderStudy();
-			return;
-		}
-
 		if (currentContent.explanationGenerated) {
-			explanationVisible = true;
+			explanationVisible = !explanationVisible;
 			translationVisible = false;
 			renderStudy();
 			return;
@@ -180,8 +172,7 @@ export function initStudy() {
 			}
 
 			const explanationMap = new Map(
-				(Array.isArray(result?.blocks) ? result.blocks : [])
-					.map(block => [block.ref, block.explanation])
+				(Array.isArray(result?.blocks) ? result.blocks : []).map(block => [block.ref, block.explanation])
 			);
 
 			const updatedContent = {
@@ -218,48 +209,8 @@ export function initStudy() {
 		}
 	}
 
-	// Arricchisce i token con il pinyin dal dizionario locale
-	async function enrichTokensWithLocalDictionary(content) {
-		if (!content || !Array.isArray(content.blocks)) return content;
-		const allWords = await getAllWords();
-		const hanziToPinyin = new Map();
-		for (const w of allWords) {
-			if (w.hanzi && w.pinyin) hanziToPinyin.set(w.hanzi, w.pinyin);
-		}
-		const updatedBlocks = content.blocks.map(block => {
-			const updatedTokens = block.tokens.map(token => {
-				if (token.pinyin && token.pinyin.trim()) return token;
-				// Prova match esatto
-				if (token.hanzi && hanziToPinyin.has(token.hanzi)) {
-					return { ...token, pinyin: hanziToPinyin.get(token.hanzi) };
-				}
-				// Fallback carattere per carattere
-				if (token.hanzi && token.hanzi.length > 1) {
-					const chars = Array.from(token.hanzi);
-					const pinyinArr = chars.map(c => hanziToPinyin.get(c) || '');
-					if (pinyinArr.every(p => p)) {
-						return { ...token, pinyin: pinyinArr.join(' ') };
-					}
-				}
-				return token;
-			});
-			return { ...block, tokens: updatedTokens };
-		});
-		const updatedContent = { ...content, blocks: updatedBlocks };
-		return updatedContent;
-	}
-
-	studyShowPinyin.onclick = async () => {
-		if (!currentContent || !isValidGeneratedContent(currentContent)) return;
-		if (!pinyinVisible) {
-			// Attiva pinyin: aggiorna i token solo localmente
-			const enriched = await enrichTokensWithLocalDictionary(currentContent);
-			currentContent = enriched;
-			saveLastGenerated(enriched);
-			pinyinVisible = true;
-		} else {
-			pinyinVisible = false;
-		}
+	studyShowPinyin.onclick = () => {
+		pinyinVisible = !pinyinVisible;
 		renderStudy();
 	};
 
@@ -277,3 +228,4 @@ export function initStudy() {
 
 	return { renderStudy };
 }
+

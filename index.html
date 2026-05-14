@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -15,7 +14,10 @@
 <body>
 	<header>
 		<div class="header-top">
-			<h1>Chinese Trainer</h1>
+			<div class="title-block">
+				<h1>Il tuo compagno cinese</h1>
+				<div class="chinese-title">你的中国同志</div>
+			</div>
 			<button id="settings-toggle" class="icon-btn" type="button" aria-label="Impostazioni" title="Impostazioni">&#9881;</button>
 		</div>
 		<nav>
@@ -27,23 +29,27 @@
 	<main>
 		<!-- Dizionario -->
 		<section id="dictionary" class="tab-section active">
-			<div class="dict-entry-row">
-				<input type="text" id="dict-input" placeholder="Inserisci carattere o parola cinese">
-				<button id="dict-find-pinyin">Trova pinyin</button>
-				<button id="dict-add">Aggiungi</button>
+			<div class="dict-entry-grid">
+				<div class="dict-entry-main">
+					<input type="text" id="dict-input" placeholder="Inserisci carattere o parola cinese">
+					<div id="dict-preview" class="dict-preview">pinyin</div>
+					<div id="dict-status" class="dict-status"></div>
+				</div>
+				<div class="dict-entry-actions">
+					<button id="dict-add">Aggiungi</button>
+					<button id="dict-find-pinyin">Trova pinyin</button>
+				</div>
 			</div>
-			<div id="dict-preview" class="dict-preview">Pinyin non ancora disponibile</div>
-			<div id="dict-status" class="dict-status"></div>
 			<div class="dict-actions">
 				<button id="dict-import">Importa dizionario</button>
 				<button id="dict-export">Esporta dizionario</button>
-				<button id="dict-clear">Cancella tutti i caratteri</button>
+				<button id="dict-clear">Cancella caratteri</button>
 				<input type="file" id="dict-import-file" accept="application/json" style="display:none">
 			</div>
-			<div class="input-group">
+			<div class="dict-list-panel">
 				<input type="text" id="dict-search-input" placeholder="Cerca nel dizionario">
+				<ul id="dict-list"></ul>
 			</div>
-			<ul id="dict-list"></ul>
 		</section>
 
 		<!-- Generazione -->
@@ -54,14 +60,14 @@
 			</div>
 			<div class="gen-topic-group">
 				<label for="gen-topic">Argomento o parola chiave</label>
-				<input type="text" id="gen-topic" placeholder="Lascia vuoto per argomento casuale" autocomplete="off">
+				<input type="text" id="gen-topic" placeholder="Argomento o parola chiave" autocomplete="off">
 			</div>
 			<div class="gen-slider-group">
 				<label for="gen-length">Lunghezza: <span id="gen-length-value">100</span> caratteri</label>
 				<input type="range" id="gen-length" min="10" max="1000" step="10" value="100">
 			</div>
-			<button id="gen-generate">Genera</button>
-			<div id="gen-title" class="gen-title"></div>
+			<button id="gen-generate">Scrivi</button>
+			<div id="gen-title" class="gen-title">[Messaggio con il titolo del testo prodotto]</div>
 		</section>
 
 		<!-- Studio -->
