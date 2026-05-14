@@ -54,6 +54,10 @@ export function initDictionary() {
 		setPreview('pinyin');
 	}
 
+	function isCurrentWord(word, hanzi) {
+		return !!word && word.hanzi === hanzi;
+	}
+
 	function renderDictList(words) {
 		dictList.innerHTML = '';
 
@@ -73,7 +77,9 @@ export function initDictionary() {
 
 			const delBtn = document.createElement('button');
 			delBtn.className = 'dict-delete';
-			delBtn.textContent = 'Elimina';
+			delBtn.textContent = '×';
+			delBtn.setAttribute('aria-label', 'Elimina');
+			delBtn.title = 'Elimina';
 			delBtn.onclick = async () => {
 				if (confirm(`Vuoi eliminare la parola "${word.hanzi}"?`)) {
 					await deleteWordById(word.id);
@@ -108,11 +114,13 @@ export function initDictionary() {
 
 	async function findPinyin() {
 		const hanzi = dictInput.value.trim();
-		if (!hanzi) return;
+		if (!hanzi) {
+			return null;
+		}
 
 		if (!hasGeminiApiKey()) {
 			setStatus('Inserisci la Gemini API key nelle Impostazioni.', 'error-message');
-			return;
+			return null;
 		}
 
 		const requestId = ++lookupToken;
@@ -139,15 +147,17 @@ export function initDictionary() {
 			};
 			setPreview(pendingWord.pinyin);
 			setStatus('');
+			return pendingWord;
 		} catch (error) {
 			if (requestId !== lookupToken) {
-				return;
+				return null;
 			}
 
 			pendingWord = null;
 			setPreview('pinyin');
 			setStatus('Non riesco a trovare il pinyin. Controlla API key o connessione.', 'error-message');
 			console.error(error);
+			return null;
 		} finally {
 			dictFindBtn.disabled = false;
 			dictFindBtn.textContent = originalLabel;
@@ -170,8 +180,13 @@ export function initDictionary() {
 			return;
 		}
 
-		if (!pendingWord || pendingWord.hanzi !== hanzi) {
-			setStatus('Prima trova il pinyin.', 'error-message');
+		let wordToSave = isCurrentWord(pendingWord, hanzi) ? pendingWord : null;
+
+		if (!wordToSave) {
+			wordToSave = await findPinyin();
+		}
+
+		if (!isCurrentWord(wordToSave, hanzi)) {
 			return;
 		}
 
@@ -180,7 +195,7 @@ export function initDictionary() {
 		dictAddBtn.textContent = 'Salvo...';
 
 		try {
-			await addWord(pendingWord.hanzi, pendingWord.pinyin);
+			await addWord(wordToSave.hanzi, wordToSave.pinyin);
 			dictInput.value = '';
 			clearPendingWord();
 			setStatus('');

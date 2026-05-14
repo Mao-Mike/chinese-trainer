@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'chinese-trainer-v9';
+const CACHE_NAME = 'chinese-trainer-v10';
 const ASSETS = [
   'index.html',
   'style.css',

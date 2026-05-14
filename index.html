@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-	<meta name="theme-color" content="#ffffff">
+	<meta name="theme-color" content="#2e7d5b">
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-status-bar-style" content="default">
 	<title>Chinese Trainer</title>
@@ -12,7 +12,7 @@
 	<link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
-	<header>
+	<header class="app-header">
 		<div class="header-top">
 			<div class="title-block">
 				<h1>Il tuo compagno cinese</h1>
@@ -20,88 +20,101 @@
 			</div>
 			<button id="settings-toggle" class="icon-btn" type="button" aria-label="Impostazioni" title="Impostazioni">&#9881;</button>
 		</div>
-		<nav>
-			<button class="tab-btn active" data-tab="dictionary">Dizionario</button>
-			<button class="tab-btn" data-tab="generation">Genera</button>
-			<button class="tab-btn" data-tab="study">Esercizio</button>
-		</nav>
 	</header>
-	<main>
-		<!-- Dizionario -->
+
+	<main class="app-main">
 		<section id="dictionary" class="tab-section active">
-			<div class="dict-entry-grid">
-				<div class="dict-entry-main">
-					<input type="text" id="dict-input" placeholder="Inserisci carattere o parola cinese">
-					<div id="dict-preview" class="dict-preview">pinyin</div>
-					<div id="dict-status" class="dict-status"></div>
-				</div>
-				<div class="dict-entry-actions">
-					<button id="dict-add">Aggiungi</button>
-					<button id="dict-find-pinyin">Trova pinyin</button>
+			<div class="card dict-entry-card">
+				<div class="dict-entry-grid">
+					<div class="dict-entry-main">
+						<input type="text" id="dict-input" class="field" placeholder="Inserisci carattere o parola cinese" autocomplete="off">
+						<div id="dict-preview" class="dict-preview">pinyin</div>
+						<div id="dict-status" class="status-message dict-status"></div>
+					</div>
+					<div class="dict-entry-actions">
+						<button id="dict-find-pinyin" class="btn btn-secondary" type="button">Trova pinyin</button>
+						<button id="dict-add" class="btn btn-primary" type="button">Aggiungi</button>
+					</div>
 				</div>
 			</div>
-			<div class="dict-actions">
-				<button id="dict-import">Importa dizionario</button>
-				<button id="dict-export">Esporta dizionario</button>
-				<button id="dict-clear">Cancella caratteri</button>
-				<input type="file" id="dict-import-file" accept="application/json" style="display:none">
+
+			<div class="card dict-tools-card">
+				<div class="dict-tools-grid">
+					<button id="dict-import" class="btn btn-secondary" type="button" aria-label="Importa dizionario">Importa</button>
+					<button id="dict-export" class="btn btn-secondary" type="button" aria-label="Esporta dizionario">Esporta</button>
+					<button id="dict-clear" class="btn btn-danger" type="button" aria-label="Cancella caratteri">Cancella</button>
+				</div>
+				<input type="file" id="dict-import-file" accept="application/json" hidden>
 			</div>
-			<div class="dict-list-panel">
-				<input type="text" id="dict-search-input" placeholder="Cerca nel dizionario">
-				<ul id="dict-list"></ul>
+
+			<div class="card dict-list-card">
+				<input type="text" id="dict-search-input" class="field" placeholder="Cerca nel dizionario" autocomplete="off">
+				<ul id="dict-list" class="dict-list"></ul>
 			</div>
 		</section>
 
-		<!-- Generazione -->
 		<section id="generation" class="tab-section">
-			<div class="gen-type">
-				<label><input type="radio" name="gen-type" value="text" checked> Testo</label>
-				<label><input type="radio" name="gen-type" value="dialogue"> Dialogo</label>
+			<div class="card generation-card">
+				<div class="gen-type" role="radiogroup" aria-label="Tipo contenuto">
+					<label class="gen-choice"><input type="radio" name="gen-type" value="text" checked> Testo</label>
+					<label class="gen-choice"><input type="radio" name="gen-type" value="dialogue"> Dialogo</label>
+				</div>
+				<div class="gen-topic-group">
+					<input type="text" id="gen-topic" class="field" placeholder="Argomento o parola chiave" autocomplete="off">
+				</div>
+				<div class="gen-slider-group">
+					<label for="gen-length" class="gen-length-label">Lunghezza: <span id="gen-length-value">100</span> caratteri</label>
+					<input type="range" id="gen-length" min="10" max="1000" step="10" value="100">
+				</div>
+				<button id="gen-generate" class="btn btn-primary btn-large" type="button">Scrivi</button>
+				<div id="gen-title" class="gen-title hidden"></div>
 			</div>
-			<div class="gen-topic-group">
-				<label for="gen-topic">Argomento o parola chiave</label>
-				<input type="text" id="gen-topic" placeholder="Argomento o parola chiave" autocomplete="off">
-			</div>
-			<div class="gen-slider-group">
-				<label for="gen-length">Lunghezza: <span id="gen-length-value">100</span> caratteri</label>
-				<input type="range" id="gen-length" min="10" max="1000" step="10" value="100">
-			</div>
-			<button id="gen-generate">Scrivi</button>
-			<div id="gen-title" class="gen-title">[Messaggio con il titolo del testo prodotto]</div>
 		</section>
 
-		<!-- Studio -->
 		<section id="study" class="tab-section">
-			<div class="study-actions study-actions--top">
-				<button id="study-show-pinyin">Mostra pinyin</button>
+			<div class="study-toolbar">
+				<button id="study-show-pinyin" class="btn btn-secondary" type="button">Mostra pinyin</button>
 			</div>
-			<div id="study-chinese" class="study-text"></div>
-			<div class="study-actions study-actions--bottom">
-				<button id="study-show-translation">Mostra traduzione</button>
-				<button id="study-explain">Mostra spiegazione</button>
+			<div class="card study-card">
+				<div id="study-chinese" class="study-text"></div>
 			</div>
-			<div id="study-translation" class="study-text hidden"></div>
-			<div id="study-explanation" class="study-text hidden"></div>
+			<div class="study-toolbar study-toolbar--bottom">
+				<button id="study-show-translation" class="btn btn-secondary" type="button">Mostra traduzione</button>
+				<button id="study-explain" class="btn btn-secondary" type="button">Mostra spiegazione</button>
+			</div>
+			<div class="card study-card">
+				<div id="study-translation" class="study-text hidden"></div>
+				<div id="study-explanation" class="study-text hidden"></div>
+			</div>
 		</section>
-		<!-- Impostazioni -->
+
 		<section id="settings" class="tab-section">
-			<h2>Impostazioni AI</h2>
-			<div class="settings-group">
-				<label for="gemini-api-key">Gemini API key</label>
-				<input type="password" id="gemini-api-key" placeholder="Inserisci Gemini API key" autocomplete="off">
+			<div class="card settings-card">
+				<h2>Impostazioni AI</h2>
+				<div class="settings-group">
+					<label for="gemini-api-key">Gemini API key</label>
+					<input type="password" id="gemini-api-key" class="field" placeholder="Inserisci Gemini API key" autocomplete="off">
+				</div>
+				<div class="settings-group">
+					<label for="gemini-model">Modello Gemini</label>
+					<input type="text" id="gemini-model" class="field" value="gemini-2.5-flash" autocomplete="off">
+				</div>
+				<div class="settings-actions">
+					<button id="settings-save" class="btn btn-primary" type="button">Salva</button>
+					<button id="settings-delete-key" class="btn btn-danger" type="button">Elimina key</button>
+					<button id="settings-test" class="btn btn-secondary" type="button">Test</button>
+				</div>
+				<div id="settings-status" class="status-message settings-status"></div>
 			</div>
-			<div class="settings-group">
-				<label for="gemini-model">Modello Gemini</label>
-				<input type="text" id="gemini-model" value="gemini-2.5-flash" autocomplete="off">
-			</div>
-			<div class="settings-actions">
-				<button id="settings-save">Salva impostazioni</button>
-				<button id="settings-delete-key">Elimina API key</button>
-				<button id="settings-test">Test connessione</button>
-			</div>
-			<div id="settings-status" class="settings-status"></div>
 		</section>
 	</main>
+
+	<nav class="bottom-nav" aria-label="Navigazione principale">
+		<button class="tab-btn active" data-tab="dictionary" type="button">Dizionario</button>
+		<button class="tab-btn" data-tab="generation" type="button">Genera</button>
+		<button class="tab-btn" data-tab="study" type="button">Esercizio</button>
+	</nav>
+
 	<script type="module" src="js/main.js"></script>
 </body>
 </html>

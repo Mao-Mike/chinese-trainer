@@ -21,6 +21,7 @@ export function initGeneration(renderStudy) {
 		button.type = 'button';
 		button.textContent = 'Riprova';
 		button.classList.add('hidden');
+		button.classList.add('btn', 'btn-secondary');
 		genTitle.insertAdjacentElement('afterend', button);
 		return button;
 	})();
@@ -29,19 +30,22 @@ export function initGeneration(renderStudy) {
 
 	function showLoading() {
 		genTitle.textContent = 'Generazione in corso...';
+		genTitle.classList.remove('hidden');
 		setStatusState(genTitle, 'loading');
 		retryBtn.classList.add('hidden');
 	}
 
 	function showError(message) {
 		genTitle.textContent = message;
+		genTitle.classList.remove('hidden');
 		setStatusState(genTitle, 'error-message');
 		retryBtn.classList.remove('hidden');
 	}
 
 	function showSuccess(title) {
-		genTitle.textContent = title;
-		setStatusState(genTitle, 'success-message');
+		genTitle.textContent = title || '';
+		genTitle.classList.toggle('hidden', !title);
+		setStatusState(genTitle, title ? 'success-message' : '');
 		retryBtn.classList.add('hidden');
 	}
 
