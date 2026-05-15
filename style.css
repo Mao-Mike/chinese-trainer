@@ -257,21 +257,16 @@ h1 {
 	color: var(--color-primary-dark);
 }
 
+
 .dict-entry-grid {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(118px, 132px);
-	gap: 12px;
-	align-items: start;
-}
-
-.dict-entry-main,
-.dict-entry-actions {
-	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
 	gap: 8px;
+	align-items: center;
 }
 
-.dict-entry-actions {
-	align-content: start;
+#dict-status {
+	grid-column: 1 / -1;
 }
 
 .dict-preview {
