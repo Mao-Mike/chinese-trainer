@@ -1,3 +1,37 @@
+// Identifica nuovi vocaboli nel testo generato rispetto al dizionario base
+export async function identifyTemporaryWordsWithAI(content, baseHanziList) {
+	// content: oggetto generato (blocks[] con chinese)
+	// baseHanziList: array di hanzi già presenti nel dizionario base
+	const text = Array.isArray(content?.blocks)
+		? content.blocks.map(b => b.chinese).join('\n')
+		: '';
+	const baseList = Array.isArray(baseHanziList) ? baseHanziList : [];
+	const prompt = `You are a Chinese vocabulary extraction assistant.\n\nGiven a generated Chinese text and a base vocabulary list, identify the Chinese words or characters that appear in the text but are not in the base vocabulary.\n\nReturn ONLY valid JSON:\n{\n  "words": [\n    {\n      "hanzi": "",\n      "pinyin": ""\n    }\n  ]\n}\n\nRules:\n- Include only Chinese words or characters that actually appear in the generated text.\n- Do not include punctuation.\n- Do not include spaces.\n- Do not include items already present in the base vocabulary.\n- Prefer meaningful word groups when obvious.\n- If unsure, use individual characters.\n- Pinyin must use tone marks.\n- Do not add translation.\n- Return JSON only.\n- No markdown.\n- No text outside JSON.\n- Maximum 30 items.\n\nGenerated content:\n${text}\n\nBase vocabulary hanzi only:\n${JSON.stringify(baseList, null, 2)}`;
+
+	let result;
+	try {
+		result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 2048 });
+	} catch (err) {
+		throw new Error('Impossibile identificare nuovi vocaboli: ' + (err?.message || err));
+	}
+	// Parsing robusto
+	let words = [];
+	if (result && typeof result === 'object' && Array.isArray(result.words)) {
+		words = result.words
+			.filter(w => w && typeof w.hanzi === 'string' && w.hanzi.trim() && typeof w.pinyin === 'string' && w.pinyin.trim())
+			.map(w => ({ hanzi: w.hanzi.trim(), pinyin: w.pinyin.trim() }));
+	}
+	// Deduplica per hanzi
+	const seen = new Set();
+	const deduped = [];
+	for (const w of words) {
+		if (!seen.has(w.hanzi)) {
+			seen.add(w.hanzi);
+			deduped.push(w);
+		}
+	}
+	return { words: deduped };
+}
 import { normalizeGeneratedContent } from './utils.js';
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';

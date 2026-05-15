@@ -1,3 +1,100 @@
+.pinyin {
+	min-height: 0.85rem;
+	line-height: 0.85rem;
+	white-space: nowrap;
+}
+.pinyin-empty {
+	visibility: hidden;
+}
+.chinese-block {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	vertical-align: top;
+}
+
+.temp-dictionary-card {
+	margin-top: 18px;
+	padding: 18px 12px 16px 12px;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-soft);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	max-width: 100%;
+	overflow-x: auto;
+}
+.temp-dictionary-header {
+	width: 100%;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 10px;
+}
+.temp-word-browser {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	margin-bottom: 12px;
+}
+.temp-word-display {
+	min-width: 120px;
+	min-height: 90px;
+	width: 120px;
+	height: 90px;
+	background: var(--color-surface-muted);
+	border-radius: var(--radius-sm);
+	margin: 0 16px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 2px 8px rgba(20,40,30,0.04);
+}
+.temp-word-hanzi {
+	font-size: 2.2rem;
+	font-weight: 700;
+	color: var(--color-primary-dark);
+	margin-bottom: 6px;
+	text-align: center;
+}
+.temp-word-pinyin {
+	font-size: 1.1rem;
+	color: var(--color-text-muted);
+	text-align: center;
+}
+.temp-word-actions {
+	display: flex;
+	gap: 12px;
+	justify-content: center;
+	width: 100%;
+	margin-top: 8px;
+}
+.temp-dictionary-card .btn {
+	min-width: 80px;
+}
+@media (max-width: 420px) {
+	.temp-dictionary-card {
+		padding: 12px 2vw 12px 2vw;
+		max-width: 100vw;
+		box-sizing: border-box;
+	}
+	.temp-word-display {
+		min-width: 90px;
+		width: 90px;
+		height: 70px;
+	}
+	.temp-word-hanzi {
+		font-size: 1.5rem;
+	}
+	.temp-word-pinyin {
+		font-size: 0.95rem;
+	}
+}
 :root {
 	--color-primary: #2e7d5b;
 	--color-primary-dark: #1f5f45;

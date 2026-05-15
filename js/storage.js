@@ -1,8 +1,10 @@
 import { createDemoTokens, fakeTranslation } from './utils.js';
 
+
 const DB_NAME = 'chinese_trainer_db';
 const DB_STORE = 'words';
-const DB_VERSION = 2;
+const TEMP_STORE = 'temporaryWords';
+const DB_VERSION = 3;
 
 let dbPromise = null;
 
@@ -17,6 +19,9 @@ export function openDB() {
 			if (!db.objectStoreNames.contains(DB_STORE)) {
 				db.createObjectStore(DB_STORE, { keyPath: 'id', autoIncrement: true });
 			}
+			if (!db.objectStoreNames.contains(TEMP_STORE)) {
+				db.createObjectStore(TEMP_STORE, { keyPath: 'id', autoIncrement: true });
+			}
 		};
 
 		req.onsuccess = e => {
@@ -29,17 +34,72 @@ export function openDB() {
 	return dbPromise;
 }
 
-async function withStore(mode, callback) {
+
+async function withStore(mode, callback, storeName = DB_STORE) {
 	const db = await openDB();
-
 	return new Promise((resolve, reject) => {
-		const tx = db.transaction(DB_STORE, mode);
-		const store = tx.objectStore(DB_STORE);
+		const tx = db.transaction(storeName, mode);
+		const store = tx.objectStore(storeName);
 		const request = callback(store);
-
 		request.onsuccess = () => resolve(request.result);
 		request.onerror = e => reject(e);
 	});
+}
+// ===================== TEMPORARY DICTIONARY =====================
+
+export function getAllTemporaryWords() {
+	return withStore('readonly', store => store.getAll(), TEMP_STORE);
+}
+
+export async function findTemporaryWordByHanzi(hanzi) {
+	const words = await getAllTemporaryWords();
+	return words.find(word => word.hanzi === hanzi);
+}
+
+async function insertTemporaryWordRecord(record) {
+	return withStore('readwrite', store => store.add(record), TEMP_STORE);
+}
+
+export async function addTemporaryWord(hanzi, pinyin) {
+	if (!hanzi) return;
+	// Non aggiungere se già nel base
+	const base = await findWordByHanzi(hanzi);
+	if (base) return;
+	// Non aggiungere se già nel temporaneo
+	const temp = await findTemporaryWordByHanzi(hanzi);
+	if (temp) return;
+	const createdAt = Date.now();
+	return insertTemporaryWordRecord({ hanzi, pinyin, createdAt });
+}
+
+export function deleteTemporaryWordById(id) {
+	return withStore('readwrite', store => store.delete(id), TEMP_STORE);
+}
+
+export async function deleteTemporaryWordByHanzi(hanzi) {
+	const words = await getAllTemporaryWords();
+	const word = words.find(w => w.hanzi === hanzi);
+	if (word) {
+		return deleteTemporaryWordById(word.id);
+	}
+}
+
+export function clearTemporaryWords() {
+	return withStore('readwrite', store => store.clear(), TEMP_STORE);
+}
+
+export async function moveTemporaryWordToBase(id) {
+	// Trova la voce temporanea
+	const words = await getAllTemporaryWords();
+	const word = words.find(w => w.id === id);
+	if (!word) return;
+	// Se non già nel base, aggiungi
+	const base = await findWordByHanzi(word.hanzi);
+	if (!base) {
+		await addWord(word.hanzi, word.pinyin);
+	}
+	// Elimina dal temporaneo
+	await deleteTemporaryWordById(id);
 }
 
 export function getAllWords() {

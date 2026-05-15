@@ -1,5 +1,72 @@
 ﻿import { explainContentWithAI, translateContentWithAI } from './ai.js';
-import { getAllWords, loadLastGenerated, saveLastGenerated } from './storage.js';
+import { getAllWords, getAllTemporaryWords, loadLastGenerated, saveLastGenerated, moveTemporaryWordToBase, deleteTemporaryWordById } from './storage.js';
+	// === TEMPORARY DICTIONARY UI ===
+	const tempDictionaryCard = document.getElementById('temp-dictionary-card');
+	const tempWordCounter = document.getElementById('temp-word-counter');
+	const tempWordPrev = document.getElementById('temp-word-prev');
+	const tempWordNext = document.getElementById('temp-word-next');
+	const tempWordHanzi = document.getElementById('temp-word-hanzi');
+	const tempWordPinyin = document.getElementById('temp-word-pinyin');
+	const tempWordSave = document.getElementById('temp-word-save');
+	const tempWordDelete = document.getElementById('temp-word-delete');
+
+	let tempWords = [];
+	let tempWordIndex = 0;
+
+	async function loadTemporaryWordsUI() {
+		tempWords = await getAllTemporaryWords();
+		if (!Array.isArray(tempWords) || tempWords.length === 0) {
+			tempDictionaryCard?.classList.add('hidden');
+			return;
+		}
+		tempDictionaryCard?.classList.remove('hidden');
+		if (tempWordIndex >= tempWords.length) tempWordIndex = 0;
+		renderTemporaryWordCard();
+	}
+
+	function renderTemporaryWordCard() {
+		if (!Array.isArray(tempWords) || tempWords.length === 0) {
+			tempDictionaryCard?.classList.add('hidden');
+			return;
+		}
+		tempDictionaryCard?.classList.remove('hidden');
+		const word = tempWords[tempWordIndex] || {};
+		tempWordHanzi.textContent = word.hanzi || '';
+		tempWordPinyin.textContent = word.pinyin || '';
+		tempWordCounter.textContent = `${tempWordIndex + 1} / ${tempWords.length}`;
+	}
+
+	function showNextTemporaryWord() {
+		if (!tempWords.length) return;
+		tempWordIndex = (tempWordIndex + 1) % tempWords.length;
+		renderTemporaryWordCard();
+	}
+
+	function showPreviousTemporaryWord() {
+		if (!tempWords.length) return;
+		tempWordIndex = (tempWordIndex - 1 + tempWords.length) % tempWords.length;
+		renderTemporaryWordCard();
+	}
+
+	async function saveCurrentTemporaryWord() {
+		const word = tempWords[tempWordIndex];
+		if (!word) return;
+		await moveTemporaryWordToBase(word.id);
+		await loadTemporaryWordsUI();
+		window.dispatchEvent(new CustomEvent('dictionary-updated'));
+	}
+
+	async function deleteCurrentTemporaryWord() {
+		const word = tempWords[tempWordIndex];
+		if (!word) return;
+		await deleteTemporaryWordById(word.id);
+		await loadTemporaryWordsUI();
+	}
+
+	if (tempWordPrev) tempWordPrev.onclick = showPreviousTemporaryWord;
+	if (tempWordNext) tempWordNext.onclick = showNextTemporaryWord;
+	if (tempWordSave) tempWordSave.onclick = saveCurrentTemporaryWord;
+	if (tempWordDelete) tempWordDelete.onclick = deleteCurrentTemporaryWord;
 import { escapeHTML, isValidGeneratedContent, normalizeGeneratedContent } from './utils.js';
 
 export function initStudy() {
@@ -77,11 +144,9 @@ export function initStudy() {
 	}
 
 	function tokenizeChineseWithDictionary(chinese, dictionaryWords) {
+		// Longest match, prefer base, poi temporaneo
 		const text = typeof chinese === 'string' ? chinese : '';
-		if (!text) {
-			return [];
-		}
-
+		if (!text) return [];
 		const words = Array.isArray(dictionaryWords)
 			? dictionaryWords
 				.filter(word => word && typeof word.hanzi === 'string' && word.hanzi.trim())
@@ -91,43 +156,34 @@ export function initStudy() {
 				}))
 				.sort((a, b) => b.hanzi.length - a.hanzi.length)
 			: [];
-
 		const tokens = [];
 		let index = 0;
-
 		while (index < text.length) {
 			let matchedWord = null;
-
 			for (const word of words) {
 				if (text.startsWith(word.hanzi, index)) {
 					matchedWord = word;
 					break;
 				}
 			}
-
 			if (matchedWord) {
-				tokens.push({
-					hanzi: matchedWord.hanzi,
-					pinyin: matchedWord.pinyin
-				});
+				tokens.push({ hanzi: matchedWord.hanzi, pinyin: matchedWord.pinyin });
 				index += matchedWord.hanzi.length;
 				continue;
 			}
-
-			tokens.push({
-				hanzi: text[index],
-				pinyin: ''
-			});
+			tokens.push({ hanzi: text[index], pinyin: '' });
 			index += 1;
 		}
-
 		return tokens;
 	}
 
 	function renderChineseBlock(token, showPinyin) {
-		const pinyin = escapeHTML(token.pinyin || '');
 		const hanzi = escapeHTML(token.hanzi || '');
-		return `<span class="chinese-block">${showPinyin ? `<span class="pinyin">${pinyin}</span>` : ''}<span class="hanzi">${hanzi}</span></span>`;
+		if (!showPinyin) {
+			return `<span class="chinese-block"><span class="hanzi">${hanzi}</span></span>`;
+		}
+		const pinyin = token.pinyin ? escapeHTML(token.pinyin) : '';
+		return `<span class="chinese-block">${pinyin ? `<span class="pinyin">${pinyin}</span>` : '<span class="pinyin pinyin-empty">&nbsp;</span>'}<span class="hanzi">${hanzi}</span></span>`;
 	}
 
 	function renderStudyLine(block, showPinyin) {
@@ -230,14 +286,36 @@ export function initStudy() {
 			return;
 		}
 
-		if (!content.pinyinGenerated) {
-			try {
-				await ensurePinyinGenerated(content);
-			} catch (error) {
-				console.error(error);
+		// Carica base + temporaneo, unisci, preferisci base
+		const [baseWords, tempWordsList] = await Promise.all([
+			getAllWords(),
+			getAllTemporaryWords()
+		]);
+		const hanziSet = new Set();
+		const combined = [];
+		for (const w of baseWords) {
+			if (w && w.hanzi && !hanziSet.has(w.hanzi)) {
+				hanziSet.add(w.hanzi);
+				combined.push({ hanzi: w.hanzi, pinyin: w.pinyin });
 			}
 		}
-
+		for (const w of tempWordsList) {
+			if (w && w.hanzi && !hanziSet.has(w.hanzi)) {
+				hanziSet.add(w.hanzi);
+				combined.push({ hanzi: w.hanzi, pinyin: w.pinyin });
+			}
+		}
+		// Aggiorna tokens per ogni block
+		const updatedContent = {
+			...content,
+			pinyinGenerated: true,
+			blocks: content.blocks.map(block => ({
+				...block,
+				tokens: tokenizeChineseWithDictionary(block.chinese, combined)
+			}))
+		};
+		currentContent = updatedContent;
+		saveLastGenerated(updatedContent);
 		pinyinVisible = true;
 		renderStudy();
 	}
@@ -463,6 +541,8 @@ export function initStudy() {
 		}
 
 		studyShowPinyin.textContent = pinyinVisible ? 'Nascondi pinyin' : 'Mostra pinyin';
+		// Aggiorna card dizionario temporaneo
+		loadTemporaryWordsUI();
 	}
 
 	studyShowPinyin.onclick = handlePinyinClick;

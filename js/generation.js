@@ -1,5 +1,5 @@
-﻿import { generateContentWithAI } from './ai.js';
-import { getAllWords, saveLastGenerated } from './storage.js';
+﻿import { generateContentWithAI, identifyTemporaryWordsWithAI } from './ai.js';
+import { getAllWords, saveLastGenerated, clearTemporaryWords, addTemporaryWord } from './storage.js';
 
 function setStatusState(element, state) {
 	element.classList.remove('loading', 'error-message', 'success-message');
@@ -114,6 +114,22 @@ export function initGeneration(renderStudy) {
 			});
 
 			saveLastGenerated(generated);
+
+			// Dizionario temporaneo: svuota, identifica nuovi vocaboli, salva
+			try {
+				await clearTemporaryWords();
+				const baseHanziList = Array.isArray(request.words) ? request.words.map(w => w.hanzi) : [];
+				const result = await identifyTemporaryWordsWithAI(generated, baseHanziList);
+				if (result && Array.isArray(result.words)) {
+					for (const w of result.words) {
+						await addTemporaryWord(w.hanzi, w.pinyin);
+					}
+				}
+			} catch (err) {
+				// Non bloccare la generazione
+				console.error('Errore identificazione vocaboli temporanei:', err);
+			}
+
 			showSuccess(generated.title);
 			renderStudy();
 		} catch (error) {

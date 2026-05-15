@@ -257,6 +257,8 @@ export function initDictionary() {
 
 	loadDict();
 
+	window.addEventListener('dictionary-updated', loadDict);
+
 	return { loadDict };
 }
 

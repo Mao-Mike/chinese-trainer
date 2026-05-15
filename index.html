@@ -80,10 +80,29 @@
 				<button id="study-show-translation" class="btn btn-secondary" type="button">Mostra traduzione</button>
 				<button id="study-explain" class="btn btn-secondary" type="button">Mostra spiegazione</button>
 			</div>
-			<div class="card study-card">
-				<div id="study-translation" class="study-text hidden"></div>
-				<div id="study-explanation" class="study-text hidden"></div>
-			</div>
+						<div class="card study-card">
+								<div id="study-translation" class="study-text hidden"></div>
+								<div id="study-explanation" class="study-text hidden"></div>
+						</div>
+
+						<div id="temp-dictionary-card" class="card temp-dictionary-card hidden">
+							<div class="temp-dictionary-header">
+								<span>Nuovi vocaboli</span>
+								<span id="temp-word-counter" class="muted"></span>
+							</div>
+							<div class="temp-word-browser">
+								<button id="temp-word-prev" class="btn btn-secondary" type="button" aria-label="Precedente">‹</button>
+								<div class="temp-word-display">
+									<div id="temp-word-hanzi" class="temp-word-hanzi"></div>
+									<div id="temp-word-pinyin" class="temp-word-pinyin"></div>
+								</div>
+								<button id="temp-word-next" class="btn btn-secondary" type="button" aria-label="Successivo">›</button>
+							</div>
+							<div class="temp-word-actions">
+								<button id="temp-word-save" class="btn btn-primary" type="button">Salva</button>
+								<button id="temp-word-delete" class="btn btn-danger" type="button">Cancella</button>
+							</div>
+						</div>
 		</section>
 
 		<section id="settings" class="tab-section">
