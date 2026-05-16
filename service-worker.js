@@ -1,11 +1,42 @@
 
-const CACHE_NAME = 'chinese-trainer-v12';
+const CACHE_NAME = 'chinese-trainer-v16';
+const ASSETS = [
+  'index.html',
+  'style.css',
+  'manifest.json',
+const CACHE_NAME = 'chinese-trainer-v13';
 const ASSETS = [
   'index.html',
   'style.css',
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
+  'js/ai.js',
+  'js/main.js',
+  'js/storage.js',
+  'js/dictionary.js',
+  'js/generation.js',
+  'js/settings.js',
+  'js/study.js',
+  'js/ui.js',
+  'js/utils.js'
+];
+const NETWORK_FIRST_ASSETS = [
+  'index.html',
+  'style.css',
+  'manifest.json',
+  'js/ai.js',
+  'js/main.js',
+  'js/storage.js',
+  'js/dictionary.js',
+  'js/generation.js',
+  'js/settings.js',
+  'js/study.js',
+  'js/ui.js',
+  'js/utils.js'
+];
+  'icon-192.png',
+const CACHE_NAME = 'chinese-trainer-v8';
   'js/ai.js',
   'js/main.js',
   'js/storage.js',

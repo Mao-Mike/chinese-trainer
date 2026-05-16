@@ -1,5 +1,62 @@
-﻿import { explainContentWithAI, translateContentWithAI } from './ai.js';
-import { getAllWords, getAllTemporaryWords, loadLastGenerated, saveLastGenerated, moveTemporaryWordToBase, deleteTemporaryWordById } from './storage.js';
+// Nessun import AI: tutto locale
+import { getAllWords, getAllTemporaryWords, moveTemporaryWordToBase, deleteTemporaryWordById, loadLastGenerated, saveLastGenerated, getAllGeneratedHistory, getGeneratedById, setCurrentGeneratedId, deleteGeneratedById } from './storage.js';
+	// === HISTORY UI ===
+	const studyHistoryBar = document.querySelector('.study-history-bar');
+	const studyHistorySelect = document.getElementById('study-history-select');
+	const studyHistoryDelete = document.getElementById('study-history-delete');
+
+	let historyList = [];
+	let isLoadingHistory = false;
+
+	async function loadHistoryUI() {
+		isLoadingHistory = true;
+		historyList = await getAllGeneratedHistory();
+		const currentId = localStorage.getItem('currentGeneratedId');
+		studyHistorySelect.innerHTML = '';
+		if (!Array.isArray(historyList) || historyList.length === 0) {
+			studyHistorySelect.innerHTML = '<option value="">(Nessuno)</option>';
+			studyHistorySelect.disabled = true;
+			studyHistoryDelete.disabled = true;
+			isLoadingHistory = false;
+			return;
+		}
+		studyHistorySelect.disabled = false;
+		studyHistoryDelete.disabled = false;
+		for (const item of historyList) {
+			const label = (item.title ? item.title + ' ' : '') + (item.createdAt ? new Date(item.createdAt).toLocaleString() : '');
+			const opt = document.createElement('option');
+			opt.value = item.id;
+			opt.textContent = label.trim() || item.id;
+			if (item.id === currentId) opt.selected = true;
+			studyHistorySelect.appendChild(opt);
+		}
+		isLoadingHistory = false;
+	}
+
+	async function handleHistorySelectChange() {
+		if (isLoadingHistory) return;
+		const id = studyHistorySelect.value;
+		if (!id) return;
+		const content = await getGeneratedById(id);
+		if (content) {
+			setCurrentGeneratedId(id);
+			await renderStudy();
+		}
+	}
+
+	async function handleHistoryDelete() {
+		const id = studyHistorySelect.value;
+		if (!id) return;
+		if (!confirm('Eliminare questo testo dallo storico?')) return;
+		await deleteGeneratedById(id);
+		// Se era il corrente, resetta
+		const currentId = localStorage.getItem('currentGeneratedId');
+		if (currentId === id) {
+			localStorage.removeItem('currentGeneratedId');
+		}
+		await loadHistoryUI();
+		await renderStudy();
+	}
 	// === TEMPORARY DICTIONARY UI ===
 	const tempDictionaryCard = document.getElementById('temp-dictionary-card');
 	const tempWordCounter = document.getElementById('temp-word-counter');
@@ -24,43 +81,56 @@ import { getAllWords, getAllTemporaryWords, loadLastGenerated, saveLastGenerated
 		renderTemporaryWordCard();
 	}
 
-	function renderTemporaryWordCard() {
-		if (!Array.isArray(tempWords) || tempWords.length === 0) {
-			tempDictionaryCard?.classList.add('hidden');
-			return;
-		}
-		tempDictionaryCard?.classList.remove('hidden');
-		const word = tempWords[tempWordIndex] || {};
-		tempWordHanzi.textContent = word.hanzi || '';
-		tempWordPinyin.textContent = word.pinyin || '';
-		tempWordCounter.textContent = `${tempWordIndex + 1} / ${tempWords.length}`;
-	}
+		async function handlePinyinClick() {
+			const content = loadCurrentContent();
+			syncContentIdentity(content);
 
-	function showNextTemporaryWord() {
-		if (!tempWords.length) return;
-		tempWordIndex = (tempWordIndex + 1) % tempWords.length;
-		renderTemporaryWordCard();
-	}
+			if (!content || !isValidGeneratedContent(content)) {
+				await renderStudy();
+				return;
+			}
 
-	function showPreviousTemporaryWord() {
-		if (!tempWords.length) return;
-		tempWordIndex = (tempWordIndex - 1 + tempWords.length) % tempWords.length;
-		renderTemporaryWordCard();
-	}
+			if (pinyinVisible) {
+				pinyinVisible = false;
+				stopSpeech();
+				await renderStudy();
+				return;
+			}
 
-	async function saveCurrentTemporaryWord() {
-		const word = tempWords[tempWordIndex];
-		if (!word) return;
-		await moveTemporaryWordToBase(word.id);
-		await loadTemporaryWordsUI();
-		window.dispatchEvent(new CustomEvent('dictionary-updated'));
-	}
-
-	async function deleteCurrentTemporaryWord() {
+			// Mostra pinyin: usa tokens già salvati, se mancano integra solo con dizionario locale
+			let needsUpdate = false;
+			for (const block of content.blocks) {
+				if (!Array.isArray(block.tokens) || block.tokens.length === 0) {
+					needsUpdate = true;
+					break;
+				}
+			}
+			if (needsUpdate) {
+				try {
+					const combined = await loadCombinedDictionary();
+					const updatedContent = {
+						...content,
+						pinyinGenerated: true,
+						blocks: content.blocks.map(block => ({
+							...block,
+							tokens: Array.isArray(block.tokens) && block.tokens.length
+								? block.tokens
+								: tokenizeChineseWithDictionary(block.chinese, combined)
+						}))
+					};
+					currentContent = updatedContent;
+					saveLastGenerated(updatedContent);
+				} catch (error) {
+					console.error(error);
+				}
+			}
+			pinyinVisible = true;
+			await renderStudy();
 		const word = tempWords[tempWordIndex];
 		if (!word) return;
 		await deleteTemporaryWordById(word.id);
 		await loadTemporaryWordsUI();
+		await renderStudy();
 	}
 
 	if (tempWordPrev) tempWordPrev.onclick = showPreviousTemporaryWord;
@@ -70,12 +140,18 @@ import { getAllWords, getAllTemporaryWords, loadLastGenerated, saveLastGenerated
 import { escapeHTML, isValidGeneratedContent, normalizeGeneratedContent } from './utils.js';
 
 export function initStudy() {
+		// Storico generazioni
+		if (studyHistorySelect) studyHistorySelect.onchange = handleHistorySelectChange;
+		if (studyHistoryDelete) studyHistoryDelete.onclick = handleHistoryDelete;
 	const studyChinese = document.getElementById('study-chinese');
 	const studyTranslation = document.getElementById('study-translation');
 	const studyExplanation = document.getElementById('study-explanation');
 	const studyShowPinyin = document.getElementById('study-show-pinyin');
 	const studyShowTranslation = document.getElementById('study-show-translation');
 	const studyExplain = document.getElementById('study-explain');
+	const studySpeak = document.getElementById('study-speak');
+	const studyStopSpeech = document.getElementById('study-stop-speech');
+	const studyStatus = document.getElementById('study-status');
 
 	let pinyinVisible = false;
 	let translationVisible = false;
@@ -87,13 +163,11 @@ export function initStudy() {
 	let pinyinRequestToken = 0;
 	let translationRequestToken = 0;
 	let explanationRequestToken = 0;
+	let baseWords = [];
+	let baseHanziSet = new Set();
+	let baseWordsPromise = null;
 
-	function setMessageState(element, state) {
-		element.classList.remove('loading', 'error-message', 'success-message');
-		if (state) {
-			element.classList.add(state);
-		}
-	}
+	   // setMessageState and setStudyStatus are now imported from study-ui.js
 
 	function hasGeminiApiKey() {
 		try {
@@ -106,6 +180,14 @@ export function initStudy() {
 		} catch {
 			return false;
 		}
+	}
+
+	function stopSpeech() {
+		if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+			return;
+		}
+
+		window.speechSynthesis.cancel();
 	}
 
 	function loadCurrentContent() {
@@ -122,7 +204,47 @@ export function initStudy() {
 			explanationVisible = false;
 			translationState = 'idle';
 			explanationState = 'idle';
+			stopSpeech();
 		}
+	}
+
+	async function loadBaseWords(forceRefresh = false) {
+		if (baseWordsPromise) {
+			return baseWordsPromise;
+		}
+
+		if (!forceRefresh && baseWords.length > 0) {
+			return baseWords;
+		}
+
+		baseWordsPromise = getAllWords()
+			.then(words => {
+				baseWords = Array.isArray(words)
+					? words
+						.map(word => ({
+							hanzi: typeof word?.hanzi === 'string' ? word.hanzi.trim() : '',
+							pinyin: typeof word?.pinyin === 'string' ? word.pinyin.trim() : ''
+						}))
+						.filter(word => !!word.hanzi)
+					: [];
+				baseHanziSet = new Set(baseWords.map(word => word.hanzi));
+				return baseWords;
+			})
+			.catch(error => {
+				console.error(error);
+				baseWords = [];
+				baseHanziSet = new Set();
+				return baseWords;
+			})
+			.finally(() => {
+				baseWordsPromise = null;
+			});
+
+		return baseWordsPromise;
+	}
+
+	function containsHanzi(value) {
+		return /[\u3400-\u9FFF]/.test(String(value || ''));
 	}
 
 	function fallbackTokens(chinese) {
@@ -143,169 +265,45 @@ export function initStudy() {
 		}));
 	}
 
-	function tokenizeChineseWithDictionary(chinese, dictionaryWords) {
-		// Longest match, prefer base, poi temporaneo
-		const text = typeof chinese === 'string' ? chinese : '';
-		if (!text) return [];
-		const words = Array.isArray(dictionaryWords)
-			? dictionaryWords
-				.filter(word => word && typeof word.hanzi === 'string' && word.hanzi.trim())
-				.map(word => ({
-					hanzi: word.hanzi.trim(),
-					pinyin: typeof word.pinyin === 'string' ? word.pinyin.trim() : ''
-				}))
-				.sort((a, b) => b.hanzi.length - a.hanzi.length)
-			: [];
-		const tokens = [];
-		let index = 0;
-		while (index < text.length) {
-			let matchedWord = null;
-			for (const word of words) {
-				if (text.startsWith(word.hanzi, index)) {
-					matchedWord = word;
-					break;
+	// loadCombinedDictionary and tokenizeChineseWithDictionary are now imported from study-dictionary.js
+
+	function getTokenClass(token) {
+		const hanzi = typeof token?.hanzi === 'string' ? token.hanzi.trim() : '';
+		if (!hanzi || !containsHanzi(hanzi)) {
+			return '';
+		}
+
+		return baseHanziSet.has(hanzi) ? 'known-token' : 'new-token';
+	}
+
+	   // UI rendering is now handled by study-ui.js
+
+	function hasMissingChinesePinyin(content) {
+		if (!content || !Array.isArray(content.blocks)) return false;
+		for (const block of content.blocks) {
+			if (!Array.isArray(block.tokens) || block.tokens.length === 0) return true;
+			for (const token of block.tokens) {
+				const hanzi = token.hanzi || '';
+				if (/^[\u3400-\u9FFF]+$/.test(hanzi) && (!token.pinyin || !token.pinyin.trim())) {
+					return true;
 				}
 			}
-			if (matchedWord) {
-				tokens.push({ hanzi: matchedWord.hanzi, pinyin: matchedWord.pinyin });
-				index += matchedWord.hanzi.length;
-				continue;
-			}
-			tokens.push({ hanzi: text[index], pinyin: '' });
-			index += 1;
 		}
-		return tokens;
-	}
-
-	function renderChineseBlock(token, showPinyin) {
-		const hanzi = escapeHTML(token.hanzi || '');
-		if (!showPinyin) {
-			return `<span class="chinese-block"><span class="hanzi">${hanzi}</span></span>`;
-		}
-		const pinyin = token.pinyin ? escapeHTML(token.pinyin) : '';
-		return `<span class="chinese-block">${pinyin ? `<span class="pinyin">${pinyin}</span>` : '<span class="pinyin pinyin-empty">&nbsp;</span>'}<span class="hanzi">${hanzi}</span></span>`;
-	}
-
-	function renderStudyLine(block, showPinyin) {
-		const tokens = normalizeTokensForRender(block);
-		return `<span class="study-line">${tokens.map(token => renderChineseBlock(token, showPinyin)).join('')}</span>`;
-	}
-
-	function renderDialogueLine(block, showPinyin) {
-		const speaker = escapeHTML(block.speaker || '');
-		return `<div class="dialogue-line"><span class="dialogue-speaker">${speaker}:</span><span class="dialogue-content study-line">${normalizeTokensForRender(block).map(token => renderChineseBlock(token, showPinyin)).join('')}</span></div>`;
-	}
-
-	function renderChineseContent(content) {
-		return content.blocks
-			.map(block => content.type === 'text'
-				? `${renderStudyLine(block, pinyinVisible)} <span class="study-ref">${escapeHTML(block.ref)}</span>`
-				: `${renderDialogueLine(block, pinyinVisible)} <span class="study-ref">${escapeHTML(block.ref)}</span>`)
-			.join('');
-	}
-
-	function renderTranslationContent(content) {
-		return content.blocks
-			.map(block => content.type === 'text'
-				? `<div>${escapeHTML(block.translation || '')} <span class="study-ref">${escapeHTML(block.ref)}</span></div>`
-				: `<div class="dialogue-line"><span class="dialogue-speaker">${escapeHTML(block.speaker || '')}:</span><span class="dialogue-content">${escapeHTML(block.translation || '')}</span><span class="study-ref">${escapeHTML(block.ref)}</span></div>`)
-			.join('');
-	}
-
-	function renderExplanationContent(content) {
-		return content.blocks
-			.map(block => content.type === 'text'
-				? `<div>${escapeHTML(block.explanation || '')} <span class="study-ref">${escapeHTML(block.ref)}</span></div>`
-				: `<div class="dialogue-line"><span class="dialogue-speaker">${escapeHTML(block.speaker || '')}:</span><span class="dialogue-content">${escapeHTML(block.explanation || '')}</span><span class="study-ref">${escapeHTML(block.ref)}</span></div>`)
-			.join('');
-	}
-
-	function showEmptyState() {
-		studyChinese.textContent = 'Testo';
-		studyChinese.classList.add('study-placeholder');
-		setMessageState(studyChinese, 'loading');
-		studyTranslation.textContent = '';
-		studyExplanation.textContent = '';
-		studyTranslation.classList.add('hidden');
-		studyExplanation.classList.add('hidden');
-	}
-
-	function showInvalidState() {
-		studyChinese.textContent = 'Il contenuto generato non è valido. Genera un nuovo testo.';
-		studyChinese.classList.add('study-placeholder');
-		setMessageState(studyChinese, 'error-message');
-		studyTranslation.textContent = '';
-		studyExplanation.textContent = '';
-		studyTranslation.classList.add('hidden');
-		studyExplanation.classList.add('hidden');
+		return false;
 	}
 
 	async function ensurePinyinGenerated(content) {
-		if (!content || !isValidGeneratedContent(content) || content.pinyinGenerated) {
+		if (!content || !isValidGeneratedContent(content)) {
 			return content;
 		}
-
+		// Se pinyinGenerated true ma ci sono token cinesi senza pinyin, aggiorna comunque
+		const needsUpdate = !content.pinyinGenerated || hasMissingChinesePinyin(content);
+		if (!needsUpdate) return content;
 		const requestId = ++pinyinRequestToken;
-		const words = await getAllWords();
+		const combined = await loadCombinedDictionary();
 		if (requestId !== pinyinRequestToken) {
 			return content;
 		}
-
-		const dictionaryWords = Array.isArray(words)
-			? words.map(word => ({
-				hanzi: typeof word.hanzi === 'string' ? word.hanzi : '',
-				pinyin: typeof word.pinyin === 'string' ? word.pinyin : ''
-			}))
-			: [];
-
-		const updatedContent = {
-			...content,
-			pinyinGenerated: true,
-			blocks: content.blocks.map(block => ({
-				...block,
-				tokens: tokenizeChineseWithDictionary(block.chinese, dictionaryWords)
-			}))
-		};
-
-		currentContent = updatedContent;
-		saveLastGenerated(updatedContent);
-		return updatedContent;
-	}
-
-	async function handlePinyinClick() {
-		const content = loadCurrentContent();
-		syncContentIdentity(content);
-		if (!content || !isValidGeneratedContent(content)) {
-			renderStudy();
-			return;
-		}
-
-		if (pinyinVisible) {
-			pinyinVisible = false;
-			renderStudy();
-			return;
-		}
-
-		// Carica base + temporaneo, unisci, preferisci base
-		const [baseWords, tempWordsList] = await Promise.all([
-			getAllWords(),
-			getAllTemporaryWords()
-		]);
-		const hanziSet = new Set();
-		const combined = [];
-		for (const w of baseWords) {
-			if (w && w.hanzi && !hanziSet.has(w.hanzi)) {
-				hanziSet.add(w.hanzi);
-				combined.push({ hanzi: w.hanzi, pinyin: w.pinyin });
-			}
-		}
-		for (const w of tempWordsList) {
-			if (w && w.hanzi && !hanziSet.has(w.hanzi)) {
-				hanziSet.add(w.hanzi);
-				combined.push({ hanzi: w.hanzi, pinyin: w.pinyin });
-			}
-		}
-		// Aggiorna tokens per ogni block
 		const updatedContent = {
 			...content,
 			pinyinGenerated: true,
@@ -316,241 +314,178 @@ export function initStudy() {
 		};
 		currentContent = updatedContent;
 		saveLastGenerated(updatedContent);
+		return updatedContent;
+	}
+
+	   // Speech helpers are now handled by study-speech.js
+
+	function handleStopSpeechClick() {
+		stopSpeech();
+		setStudyStatus('');
+	}
+
+	async function handlePinyinClick() {
+		const content = loadCurrentContent();
+		syncContentIdentity(content);
+
+		if (!content || !isValidGeneratedContent(content)) {
+			await renderStudy();
+			return;
+		}
+
+		if (pinyinVisible) {
+			pinyinVisible = false;
+			stopSpeech();
+			await renderStudy();
+			return;
+		}
+
+		// Mostra pinyin: usa base + temporaneo, aggiorna tokens sempre
+		try {
+			const combined = await loadCombinedDictionary();
+			const updatedContent = {
+				...content,
+				pinyinGenerated: true,
+				blocks: content.blocks.map(block => ({
+					...block,
+					tokens: tokenizeChineseWithDictionary(block.chinese, combined)
+				}))
+			};
+			currentContent = updatedContent;
+			saveLastGenerated(updatedContent);
+		} catch (error) {
+			console.error(error);
+		}
 		pinyinVisible = true;
-		renderStudy();
+		await renderStudy();
 	}
 
 	async function handleTranslationClick() {
 		const content = loadCurrentContent();
 		syncContentIdentity(content);
+
 		if (!content || !isValidGeneratedContent(content)) {
-			renderStudy();
+			await renderStudy();
 			return;
 		}
 
 		if (translationVisible) {
 			translationVisible = false;
-			renderStudy();
+			stopSpeech();
+			await renderStudy();
 			return;
 		}
 
 		explanationVisible = false;
+		stopSpeech();
 
-		if (content.translationGenerated) {
-			translationVisible = true;
-			translationState = 'ready';
-			renderStudy();
-			return;
-		}
-
-		if (!hasGeminiApiKey()) {
-			translationVisible = true;
-			translationState = 'error';
-			studyTranslation.textContent = 'Inserisci la Gemini API key nelle Impostazioni.';
-			studyTranslation.classList.remove('hidden');
-			setMessageState(studyTranslation, 'error-message');
-			studyExplanation.classList.add('hidden');
-			return;
-		}
-
-		const requestId = ++translationRequestToken;
-		studyShowTranslation.disabled = true;
 		translationVisible = true;
-		translationState = 'loading';
-		studyTranslation.textContent = 'Genero traduzione...';
-		studyTranslation.classList.remove('hidden');
-		setMessageState(studyTranslation, 'loading');
-		studyExplanation.classList.add('hidden');
-
-		try {
-			const result = await translateContentWithAI(content);
-			if (requestId !== translationRequestToken) {
-				return;
-			}
-
-			const translationMap = new Map(
-				(Array.isArray(result?.blocks) ? result.blocks : []).map(block => [block.ref, block.translation])
-			);
-
-			const updatedContent = {
-				...content,
-				translationGenerated: true,
-				blocks: content.blocks.map(block => ({
-					...block,
-					translation: translationMap.get(block.ref) || block.translation || ''
-				}))
-			};
-
-			currentContent = updatedContent;
-			translationState = 'ready';
-			saveLastGenerated(updatedContent);
-			renderStudy();
-		} catch (error) {
-			if (requestId !== translationRequestToken) {
-				return;
-			}
-
-			console.error(error);
-			translationState = 'error';
-			studyTranslation.textContent = 'Errore durante la generazione della traduzione.';
-			studyTranslation.classList.remove('hidden');
-			setMessageState(studyTranslation, 'error-message');
-		} finally {
-			if (requestId === translationRequestToken) {
-				studyShowTranslation.disabled = false;
-			}
-		}
+		translationState = 'ready';
+		await renderStudy();
 	}
 
 	async function handleExplainClick() {
 		const content = loadCurrentContent();
 		syncContentIdentity(content);
+
 		if (!content || !isValidGeneratedContent(content)) {
-			renderStudy();
+			await renderStudy();
 			return;
 		}
 
 		if (explanationVisible) {
 			explanationVisible = false;
-			renderStudy();
+			stopSpeech();
+			await renderStudy();
 			return;
 		}
 
 		translationVisible = false;
+		stopSpeech();
 
-		if (content.explanationGenerated) {
-			explanationVisible = true;
-			explanationState = 'ready';
-			renderStudy();
-			return;
-		}
-
-		if (!hasGeminiApiKey()) {
-			explanationVisible = true;
-			explanationState = 'error';
-			studyExplanation.textContent = 'Inserisci la Gemini API key nelle Impostazioni.';
-			studyExplanation.classList.remove('hidden');
-			setMessageState(studyExplanation, 'error-message');
-			studyTranslation.classList.add('hidden');
-			return;
-		}
-
-		const requestId = ++explanationRequestToken;
-		studyExplain.disabled = true;
 		explanationVisible = true;
-		explanationState = 'loading';
-		studyExplanation.textContent = 'Genero spiegazione...';
-		studyExplanation.classList.remove('hidden');
-		setMessageState(studyExplanation, 'loading');
-		studyTranslation.classList.add('hidden');
-
-		try {
-			const result = await explainContentWithAI(content);
-			if (requestId !== explanationRequestToken) {
-				return;
-			}
-
-			const explanationMap = new Map(
-				(Array.isArray(result?.blocks) ? result.blocks : []).map(block => [block.ref, block.explanation])
-			);
-
-			const updatedContent = {
-				...content,
-				explanationGenerated: true,
-				blocks: content.blocks.map(block => ({
-					...block,
-					explanation: explanationMap.get(block.ref) || block.explanation || ''
-				}))
-			};
-
-			currentContent = updatedContent;
-			explanationState = 'ready';
-			saveLastGenerated(updatedContent);
-			renderStudy();
-		} catch (error) {
-			if (requestId !== explanationRequestToken) {
-				return;
-			}
-
-			console.error(error);
-			explanationState = 'error';
-			studyExplanation.textContent = 'Errore durante la generazione della spiegazione.';
-			studyExplanation.classList.remove('hidden');
-			setMessageState(studyExplanation, 'error-message');
-		} finally {
-			if (requestId === explanationRequestToken) {
-				studyExplain.disabled = false;
-			}
-		}
+		explanationState = 'ready';
+		await renderStudy();
 	}
 
-	function renderStudy() {
-		const content = loadCurrentContent();
-		syncContentIdentity(content);
+	   async function renderStudy() {
+		   await loadHistoryUI();
+		   stopSpeech();
+		   const content = loadCurrentContent();
+		   syncContentIdentity(content);
+		   await loadBaseWords(true);
 
-		if (!content) {
-			showEmptyState();
-			studyShowPinyin.textContent = 'Mostra pinyin';
-			return;
-		}
+		   if (!content) {
+			   showEmptyState(studyChinese, studyTranslation, studyExplanation, setMessageState, (msg, state) => setStudyStatus(studyStatus, msg, state));
+			   studyShowPinyin.textContent = 'Mostra pinyin';
+			   await loadTemporaryWordsUI();
+			   return;
+		   }
+		   if (!isValidGeneratedContent(content)) {
+			   showInvalidState(studyChinese, studyTranslation, studyExplanation, setMessageState, (msg, state) => setStudyStatus(studyStatus, msg, state));
+			   studyShowPinyin.textContent = 'Mostra pinyin';
+			   await loadTemporaryWordsUI();
+			   return;
+		   }
 
-		if (!isValidGeneratedContent(content)) {
-			showInvalidState();
-			studyShowPinyin.textContent = 'Mostra pinyin';
-			return;
-		}
+		   studyChinese.classList.remove('study-placeholder');
+		   setMessageState(studyChinese, null);
+		   studyChinese.innerHTML = renderChineseContent(content, pinyinVisible, getTokenClass, normalizeTokensForRender);
 
-		studyChinese.classList.remove('study-placeholder');
-		setMessageState(studyChinese, null);
-		studyChinese.innerHTML = renderChineseContent(content);
+		   if (translationVisible) {
+			   studyTranslation.classList.remove('hidden');
+			   if (translationState === 'loading') {
+				   studyTranslation.textContent = 'Genero traduzione...';
+				   setMessageState(studyTranslation, 'loading');
+			   } else if (translationState === 'error') {
+				   setMessageState(studyTranslation, 'error-message');
+			   } else if (content.translationGenerated || translationState === 'ready') {
+				   studyTranslation.innerHTML = renderTranslationContent(content);
+				   setMessageState(studyTranslation, null);
+			   } else {
+				   studyTranslation.textContent = '';
+				   setMessageState(studyTranslation, null);
+			   }
+		   } else {
+			   studyTranslation.classList.add('hidden');
+		   }
 
-		if (translationVisible) {
-			studyTranslation.classList.remove('hidden');
-			if (translationState === 'loading') {
-				studyTranslation.textContent = 'Genero traduzione...';
-				setMessageState(studyTranslation, 'loading');
-			} else if (translationState === 'error') {
-				setMessageState(studyTranslation, 'error-message');
-			} else if (content.translationGenerated || translationState === 'ready') {
-				studyTranslation.innerHTML = renderTranslationContent(content);
-				setMessageState(studyTranslation, null);
-			} else {
-				studyTranslation.textContent = '';
-				setMessageState(studyTranslation, null);
-			}
-		} else {
-			studyTranslation.classList.add('hidden');
-		}
+		   if (explanationVisible) {
+			   studyExplanation.classList.remove('hidden');
+			   if (explanationState === 'loading') {
+				   studyExplanation.textContent = 'Genero spiegazione...';
+				   setMessageState(studyExplanation, 'loading');
+			   } else if (explanationState === 'error') {
+				   setMessageState(studyExplanation, 'error-message');
+			   } else if (content.explanationGenerated || explanationState === 'ready') {
+				   studyExplanation.innerHTML = renderExplanationContent(content);
+				   setMessageState(studyExplanation, null);
+			   } else {
+				   studyExplanation.textContent = '';
+				   setMessageState(studyExplanation, null);
+			   }
+		   } else {
+			   studyExplanation.classList.add('hidden');
+		   }
 
-		if (explanationVisible) {
-			studyExplanation.classList.remove('hidden');
-			if (explanationState === 'loading') {
-				studyExplanation.textContent = 'Genero spiegazione...';
-				setMessageState(studyExplanation, 'loading');
-			} else if (explanationState === 'error') {
-				setMessageState(studyExplanation, 'error-message');
-			} else if (content.explanationGenerated || explanationState === 'ready') {
-				studyExplanation.innerHTML = renderExplanationContent(content);
-				setMessageState(studyExplanation, null);
-			} else {
-				studyExplanation.textContent = '';
-				setMessageState(studyExplanation, null);
-			}
-		} else {
-			studyExplanation.classList.add('hidden');
-		}
+		   studyShowPinyin.textContent = pinyinVisible ? 'Nascondi pinyin' : 'Mostra pinyin';
+		   await loadTemporaryWordsUI();
+	   }
 
-		studyShowPinyin.textContent = pinyinVisible ? 'Nascondi pinyin' : 'Mostra pinyin';
-		// Aggiorna card dizionario temporaneo
-		loadTemporaryWordsUI();
-	}
+	window.addEventListener('beforeunload', stopSpeech);
 
 	studyShowPinyin.onclick = handlePinyinClick;
 	studyShowTranslation.onclick = handleTranslationClick;
 	studyExplain.onclick = handleExplainClick;
+	   if (studySpeak) {
+		   studySpeak.onclick = () => speakChineseText(loadCurrentContent(), (msg, state) => setStudyStatus(studyStatus, msg, state));
+	   }
+	if (studyStopSpeech) {
+		studyStopSpeech.onclick = handleStopSpeechClick;
+	}
 
-	renderStudy();
+	void loadBaseWords(true);
+	void renderStudy();
 
 	return { renderStudy };
 }
-

@@ -1,317 +1,65 @@
-// Identifica nuovi vocaboli nel testo generato rispetto al dizionario base
-export async function identifyTemporaryWordsWithAI(content, baseHanziList) {
-	// content: oggetto generato (blocks[] con chinese)
-	// baseHanziList: array di hanzi già presenti nel dizionario base
-	const text = Array.isArray(content?.blocks)
-		? content.blocks.map(b => b.chinese).join('\n')
-		: '';
-	const baseList = Array.isArray(baseHanziList) ? baseHanziList : [];
-	const prompt = `You are a Chinese vocabulary extraction assistant.\n\nGiven a generated Chinese text and a base vocabulary list, identify the Chinese words or characters that appear in the text but are not in the base vocabulary.\n\nReturn ONLY valid JSON:\n{\n  "words": [\n    {\n      "hanzi": "",\n      "pinyin": ""\n    }\n  ]\n}\n\nRules:\n- Include only Chinese words or characters that actually appear in the generated text.\n- Do not include punctuation.\n- Do not include spaces.\n- Do not include items already present in the base vocabulary.\n- Prefer meaningful word groups when obvious.\n- If unsure, use individual characters.\n- Pinyin must use tone marks.\n- Do not add translation.\n- Return JSON only.\n- No markdown.\n- No text outside JSON.\n- Maximum 30 items.\n\nGenerated content:\n${text}\n\nBase vocabulary hanzi only:\n${JSON.stringify(baseList, null, 2)}`;
 
-	let result;
-	try {
-		result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 2048 });
-	} catch (err) {
-		throw new Error('Impossibile identificare nuovi vocaboli: ' + (err?.message || err));
-	}
-	// Parsing robusto
-	let words = [];
-	if (result && typeof result === 'object' && Array.isArray(result.words)) {
-		words = result.words
-			.filter(w => w && typeof w.hanzi === 'string' && w.hanzi.trim() && typeof w.pinyin === 'string' && w.pinyin.trim())
-			.map(w => ({ hanzi: w.hanzi.trim(), pinyin: w.pinyin.trim() }));
-	}
-	// Deduplica per hanzi
-	const seen = new Set();
-	const deduped = [];
-	for (const w of words) {
-		if (!seen.has(w.hanzi)) {
-			seen.add(w.hanzi);
-			deduped.push(w);
-		}
-	}
-	return { words: deduped };
-}
+import { getCachedPinyin, setCachedPinyin, incrementAIUsage } from './storage.js';
+import { dedupeAIRequest } from './ai-dedupe.js';
+import { callGeminiJSON } from './ai-gemini.js';
+import { PROMPT_PINYIN, PROMPT_GENERATE } from './ai-prompts.js';
+import { makeId } from './ai-utils.js';
 import { normalizeGeneratedContent } from './utils.js';
 
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
-const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
-
-function makeId() {
-	if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-		return crypto.randomUUID();
-	}
-
-	return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function readStorageValue(key) {
-	try {
-		if (typeof localStorage === 'undefined') {
-			return '';
-		}
-
-		const direct = localStorage.getItem(key);
-		if (typeof direct === 'string' && direct.trim()) {
-			return direct.trim();
-		}
-
-		const propertyValue = localStorage[key];
-		return typeof propertyValue === 'string' ? propertyValue.trim() : '';
-	} catch {
-		return '';
-	}
-}
-
-function getGeminiApiKey() {
-	return readStorageValue('geminiApiKey');
-}
-
-function getGeminiModel() {
-	return readStorageValue('geminiModel') || DEFAULT_GEMINI_MODEL;
-}
-
-function stripMarkdownFences(value) {
-	const text = String(value ?? '').trim();
-	const fenced = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-	if (fenced) {
-		return fenced[1].trim();
-	}
-
-	return text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-}
-
-function extractJSONText(value) {
-	const text = stripMarkdownFences(value);
-	if (!text) {
-		return '';
-	}
-
-	const firstObject = text.indexOf('{');
-	const lastObject = text.lastIndexOf('}');
-	if (firstObject !== -1 && lastObject !== -1 && lastObject > firstObject) {
-		return text.slice(firstObject, lastObject + 1);
-	}
-
-	const firstArray = text.indexOf('[');
-	const lastArray = text.lastIndexOf(']');
-	if (firstArray !== -1 && lastArray !== -1 && lastArray > firstArray) {
-		return text.slice(firstArray, lastArray + 1);
-	}
-
-	return text;
-}
-
-function parseGeminiJSON(text) {
-	const cleaned = extractJSONText(text);
-	if (!cleaned) {
-		throw new Error('Gemini returned empty response');
-	}
-
-	try {
-		return JSON.parse(cleaned);
-	} catch {
-		console.error('Gemini returned invalid JSON', text);
-		throw new Error('Gemini returned invalid JSON');
-	}
-}
-
-async function callGeminiJSON(prompt, options = {}) {
-	const apiKey = getGeminiApiKey();
-	if (!apiKey) {
-		throw new Error('Gemini API key missing. Set localStorage.geminiApiKey first.');
-	}
-
-	const model = options.model || getGeminiModel();
-	const endpoint = `${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-	const temperature = typeof options.temperature === 'number' ? options.temperature : 0.2;
-	const maxOutputTokens = typeof options.maxOutputTokens === 'number' ? options.maxOutputTokens : 8192;
-
-	const response = await fetch(endpoint, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify({
-			contents: [
-				{
-					role: 'user',
-					parts: [{ text: String(prompt) }]
-				}
-			],
-			generationConfig: {
-				temperature,
-				maxOutputTokens,
-				responseMimeType: 'application/json'
-			}
-		})
-	});
-
-	if (!response.ok) {
-		let body = '';
-		try {
-			body = (await response.text()).trim();
-		} catch {
-			body = '';
-		}
-
-		console.error('Gemini HTTP error', {
-			status: response.status,
-			model,
-			body
-		});
-
-		throw new Error(`Gemini request failed (${response.status})`);
-	}
-
-	let responseData;
-	let rawResponse = '';
-	try {
-		rawResponse = await response.text();
-		responseData = JSON.parse(rawResponse);
-	} catch {
-		console.error('Gemini returned invalid JSON', rawResponse);
-		throw new Error('Gemini returned invalid JSON');
-	}
-
-	const text = responseData?.candidates?.[0]?.content?.parts?.[0]?.text;
-	if (typeof text !== 'string' || !text.trim()) {
-		console.error('Gemini returned empty response', responseData);
-		throw new Error('Gemini returned empty response');
-	}
-
-	return parseGeminiJSON(text);
-}
-
+// --- Vocabolario ---
 function normalizeVocabularyWord(word, index) {
-	if (!word) {
-		return null;
-	}
-
+	if (!word) return null;
 	if (typeof word === 'string') {
 		const hanzi = word.trim();
 		return hanzi ? { hanzi, createdAt: 0, index } : null;
 	}
-
-	if (typeof word !== 'object') {
-		return null;
-	}
-
+	if (typeof word !== 'object') return null;
 	const hanzi = typeof word.hanzi === 'string' ? word.hanzi.trim() : '';
-	if (!hanzi) {
-		return null;
-	}
-
+	if (!hanzi) return null;
 	const createdAt = Number.isFinite(Number(word.createdAt)) ? Number(word.createdAt) : 0;
 	return { hanzi, createdAt, index };
 }
 
 export function selectHanziVocabulary(words, maxWords = 120) {
-	if (!Array.isArray(words) || maxWords <= 0) {
-		return [];
-	}
-
-	const normalized = words
-		.map((word, index) => normalizeVocabularyWord(word, index))
-		.filter(Boolean);
-
+	if (!Array.isArray(words) || maxWords <= 0) return [];
+	const normalized = words.map((word, index) => normalizeVocabularyWord(word, index)).filter(Boolean);
 	const hasCreatedAt = normalized.some(item => item.createdAt > 0);
 	const ordered = hasCreatedAt
-		? normalized.slice().sort((a, b) => {
-			const timeDiff = (b.createdAt || 0) - (a.createdAt || 0);
-			return timeDiff !== 0 ? timeDiff : a.index - b.index;
-		})
+		? normalized.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0) || a.index - b.index)
 		: normalized;
-
 	const seen = new Set();
 	const vocabulary = [];
-
 	for (const item of ordered) {
-		if (seen.has(item.hanzi)) {
-			continue;
-		}
-
+		if (seen.has(item.hanzi)) continue;
 		seen.add(item.hanzi);
 		vocabulary.push(item.hanzi);
-
-		if (vocabulary.length >= maxWords) {
-			break;
-		}
+		if (vocabulary.length >= maxWords) break;
 	}
-
 	return vocabulary;
 }
 
-function buildRefsFromContent(content, fallbackLength) {
-	const blocks = Array.isArray(content?.blocks) ? content.blocks : [];
-	const length = blocks.length || fallbackLength || 0;
-	return Array.from({ length }, (_, index) => {
-		const ref = typeof blocks[index]?.ref === 'string' && blocks[index].ref.trim()
-			? blocks[index].ref.trim()
-			: `[${index + 1}]`;
-		return ref;
-	});
-}
-
-function mapBlocksWithField(resultBlocks, fallbackRefs, field) {
-	return fallbackRefs.map((ref, index) => {
-		const resultBlock = Array.isArray(resultBlocks) ? resultBlocks[index] : null;
-		const blockRef = typeof resultBlock?.ref === 'string' && resultBlock.ref.trim() ? resultBlock.ref.trim() : ref;
-		return {
-			ref: blockRef,
-			[field]: typeof resultBlock?.[field] === 'string' ? resultBlock[field] : ''
-		};
-	});
-}
-
-function cleanGeneratedBlocks(blocks) {
-	return blocks.map((block, index) => {
-		const ref = typeof block.ref === 'string' && block.ref.trim() ? block.ref.trim() : `[${index + 1}]`;
-		const speaker = typeof block.speaker === 'string' && /^[ABCD]$/.test(block.speaker.trim())
-			? block.speaker.trim()
-			: null;
-
-		return {
-			ref,
-			speaker,
-			chinese: typeof block.chinese === 'string' ? block.chinese : '',
-			tokens: [],
-			translation: '',
-			explanation: ''
-		};
-	});
-}
-
+// --- Funzioni principali ---
 export async function enrichWordWithAI(hanzi) {
-	const prompt = `You are a Chinese dictionary assistant.
-The user provides one Chinese word or character.
-
-Return ONLY valid JSON:
-{
-  "hanzi": "...",
-  "pinyin": "...",
-  "notes": "..."
-}
-
-Rules:
-- pinyin must use tone marks
-- hanzi must be simplified Chinese if possible
-- no markdown
-- no text outside JSON
-
-User input:
-${String(hanzi ?? '').trim()}`;
-
-	const result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 1024 });
-	if (!result || typeof result !== 'object' || Array.isArray(result)) {
-		throw new Error('Gemini returned invalid word data.');
+	if (!hanzi || typeof hanzi !== 'string' || !hanzi.trim()) return { hanzi: '', pinyin: '' };
+	const cached = getCachedPinyin(hanzi);
+	if (cached && cached.pinyin) {
+		return { hanzi: cached.hanzi, pinyin: cached.pinyin, notes: 'from cache' };
 	}
-
-	return {
-		hanzi: typeof result.hanzi === 'string' ? result.hanzi : String(hanzi ?? ''),
-		pinyin: typeof result.pinyin === 'string' ? result.pinyin : '',
-		notes: typeof result.notes === 'string' ? result.notes : ''
-	};
+	const key = `pinyin:${hanzi}`;
+	return dedupeAIRequest(key, async () => {
+		incrementAIUsage('pinyin');
+		const prompt = PROMPT_PINYIN + String(hanzi ?? '').trim();
+		const result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 1024 });
+		if (!result || typeof result !== 'object' || Array.isArray(result)) {
+			throw new Error('Gemini returned invalid word data.');
+		}
+		if (result.pinyin) setCachedPinyin(hanzi, result.pinyin);
+		return {
+			hanzi: typeof result.hanzi === 'string' ? result.hanzi : String(hanzi ?? ''),
+			pinyin: typeof result.pinyin === 'string' ? result.pinyin : '',
+			notes: typeof result.notes === 'string' ? result.notes : ''
+		};
+	});
 }
 
 export async function generateContentWithAI(options = {}) {
@@ -319,74 +67,46 @@ export async function generateContentWithAI(options = {}) {
 	const topic = typeof options?.topic === 'string' ? options.topic.trim() : '';
 	const targetLength = Number(options?.targetLength) || 100;
 	const hanziVocabulary = selectHanziVocabulary(options?.words, 120);
-
-	const prompt = `You are a Chinese text generator for a Chinese learning app.
-
-Generate ONLY Chinese content.
-
-Return ONLY valid JSON:
-{
-  "type": "text",
-  "title": "",
-  "topic": "",
-  "targetLength": 100,
-  "blocks": [
-    {
-      "ref": "[1]",
-      "speaker": null,
-      "chinese": ""
-    }
-  ],
-  "usedWords": [],
-  "newWords": []
+	const key = `generate:${type}:${targetLength}:${topic}:${JSON.stringify(hanziVocabulary)}`;
+	return dedupeAIRequest(key, async () => {
+		incrementAIUsage('generation');
+		const prompt = PROMPT_GENERATE + JSON.stringify({ type, topic, targetLength }, null, 2) + "\n\nUser vocabulary hanzi only:\n" + JSON.stringify(hanziVocabulary, null, 2);
+		const result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 8192 });
+		const normalized = normalizeGeneratedContent(result);
+		if (!normalized || !Array.isArray(normalized.blocks) || !normalized.blocks.length) {
+			throw new Error('Gemini returned content without blocks.');
+		}
+		// Flags: tutto già generato
+		normalized.pinyinGenerated = true;
+		normalized.translationGenerated = true;
+		normalized.explanationGenerated = true;
+		if (!normalized.id) normalized.id = makeId();
+		if (!normalized.createdAt) normalized.createdAt = Date.now();
+		normalized.blocks = normalized.blocks.map((block, idx) => {
+			const tokens = Array.isArray(block.tokens) && block.tokens.length
+				? block.tokens.map(t => ({
+					hanzi: typeof t.hanzi === 'string' ? t.hanzi : '',
+					pinyin: typeof t.pinyin === 'string' ? t.pinyin : '',
+					isNew: !!t.isNew
+				}))
+				: Array.from(block.chinese || '').map(char => ({ hanzi: char, pinyin: '', isNew: false }));
+			return {
+				ref: typeof block.ref === 'string' && block.ref.trim() ? block.ref.trim() : `[${idx + 1}]`,
+				speaker: type === 'dialogue' ? (block.speaker || ['A', 'B', 'C', 'D'][idx % 4]) : null,
+				chinese: typeof block.chinese === 'string' ? block.chinese : '',
+				tokens,
+				translation: typeof block.translation === 'string' ? block.translation : '',
+				explanation: typeof block.explanation === 'string' ? block.explanation : ''
+			};
+		});
+		normalized.newWords = Array.isArray(normalized.newWords)
+			? normalized.newWords.filter(w => w && typeof w.hanzi === 'string' && w.hanzi && typeof w.pinyin === 'string')
+			: [];
+		return normalized;
+	});
 }
 
-Rules:
-- type must be exactly the requested type: "text" or "dialogue".
-- If type is "text", speaker must be null.
-- If type is "dialogue", speaker must be "A", "B", "C", or "D".
-- Use simplified Chinese characters.
-- Use mostly the provided user vocabulary when possible.
-- Introduce new words only if necessary.
-- Do not generate pinyin.
-- Do not generate translation.
-- Do not generate explanation.
-- Split text into blocks of about 100 Chinese characters.
-- For dialogue, use one block per turn.
-- Return JSON only.
-- No markdown.
-- No comments outside JSON.
-
-Requested settings:
-${JSON.stringify({ type, topic, targetLength }, null, 2)}
-
-User vocabulary hanzi only:
-${JSON.stringify(hanziVocabulary, null, 2)}`;
-
-	const result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 8192 });
-	const normalized = normalizeGeneratedContent(result);
-
-	if (!normalized || !Array.isArray(normalized.blocks) || !normalized.blocks.length) {
-		throw new Error('Gemini returned content without blocks.');
-	}
-
-	const cleanedBlocks = cleanGeneratedBlocks(normalized.blocks);
-
-	return {
-		id: typeof normalized.id === 'string' && normalized.id.trim() ? normalized.id.trim() : makeId(),
-		createdAt: Number.isFinite(Number(normalized.createdAt)) ? Number(normalized.createdAt) : Date.now(),
-		type: normalized.type === 'dialogue' ? 'dialogue' : 'text',
-		title: typeof normalized.title === 'string' ? normalized.title : '',
-		topic: typeof normalized.topic === 'string' ? normalized.topic : topic,
-		targetLength: Number.isFinite(Number(normalized.targetLength)) ? Number(normalized.targetLength) : targetLength,
-		blocks: cleanedBlocks,
-		usedWords: Array.isArray(normalized.usedWords) ? normalized.usedWords : [],
-		newWords: Array.isArray(normalized.newWords) ? normalized.newWords : [],
-		pinyinGenerated: false,
-		translationGenerated: false,
-		explanationGenerated: false
-	};
-}
+// Le funzioni legacy translateContentWithAI ed explainContentWithAI possono essere migrate qui se necessario.
 
 export async function translateContentWithAI(content) {
 	const prompt = `You are a concise Chinese to English translator.

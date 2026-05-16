@@ -1,4 +1,4 @@
-﻿import { generateContentWithAI, identifyTemporaryWordsWithAI } from './ai.js';
+﻿import { generateContentWithAI } from './ai.js';
 import { getAllWords, saveLastGenerated, clearTemporaryWords, addTemporaryWord } from './storage.js';
 
 function setStatusState(element, state) {
@@ -96,50 +96,53 @@ export function initGeneration(renderStudy) {
 		}
 	}
 
-	async function handleGeneration(request) {
-		if (!hasGeminiApiKey()) {
-			showError('Inserisci la Gemini API key in Impostazioni.');
-			return;
-		}
-
-		genBtn.disabled = true;
-		showLoading();
-
-		try {
-			const generated = await generateContentWithAI({
-				type: request.type,
-				topic: request.topic,
-				targetLength: request.length,
-				words: request.words
-			});
-
-			saveLastGenerated(generated);
-
-			// Dizionario temporaneo: svuota, identifica nuovi vocaboli, salva
-			try {
-				await clearTemporaryWords();
-				const baseHanziList = Array.isArray(request.words) ? request.words.map(w => w.hanzi) : [];
-				const result = await identifyTemporaryWordsWithAI(generated, baseHanziList);
-				if (result && Array.isArray(result.words)) {
-					for (const w of result.words) {
-						await addTemporaryWord(w.hanzi, w.pinyin);
-					}
-				}
-			} catch (err) {
-				// Non bloccare la generazione
-				console.error('Errore identificazione vocaboli temporanei:', err);
-			}
-
-			showSuccess(generated.title);
-			renderStudy();
-		} catch (error) {
-			console.error(error);
-			showError(getGenerationErrorMessage(error));
-			renderStudy();
-		} finally {
-			genBtn.disabled = false;
-		}
-	}
+	   async function handleGeneration(request) {
+		   if (!hasGeminiApiKey()) {
+			   showError('Inserisci la Gemini API key in Impostazioni.');
+			   return;
+		   }
+		   genBtn.disabled = true;
+		   retryBtn.disabled = true;
+		   showLoading();
+		   try {
+			   const generated = await generateContentWithAI({
+				   type: request.type,
+				   topic: request.topic,
+				   targetLength: request.length,
+				   words: request.words
+			   });
+			   await saveLastGenerated(generated); // salva anche nello storico e imposta current
+			   // Dizionario temporaneo: svuota, aggiungi newWords
+			   try {
+				   await clearTemporaryWords();
+				   if (Array.isArray(generated.newWords)) {
+					   for (const w of generated.newWords) {
+						   try {
+							   await addTemporaryWord(w.hanzi, w.pinyin);
+						   } catch (err) {
+							   console.error('Errore addTemporaryWord:', w, err);
+						   }
+					   }
+				   }
+			   } catch (err) {
+				   // Non bloccare la generazione
+				   console.error('Errore gestione vocaboli temporanei:', err);
+			   }
+			   showSuccess(generated.title);
+			   renderStudy();
+		   } catch (error) {
+			   console.error(error);
+			   if (error && typeof error.message === 'string' && error.message.toLowerCase().includes('quota')) {
+				   showError('Limite gratuito AI raggiunto. Riprova più tardi.');
+			   } else {
+				   showError(getGenerationErrorMessage(error));
+			   }
+			   renderStudy();
+		   } finally {
+			   genBtn.disabled = false;
+			   retryBtn.disabled = false;
+		   }
+	   }
 
 	genBtn.onclick = async () => {
 		const type = Array.from(genTypeRadios).find(radio => radio.checked).value;

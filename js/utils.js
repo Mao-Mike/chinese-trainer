@@ -19,7 +19,7 @@ export function fakePinyin(word) {
 	return word.split('').map(() => 'pīn').join(' ');
 }
 
-export function fakeTranslation(word) {
+function fakeTranslation(word) {
 	return 'Traduzione di ' + word;
 }
 
@@ -36,11 +36,11 @@ export function escapeHTML(value) {
 		.replace(/'/g, '&#39;');
 }
 
-export function createDemoTokens(chinese) {
-	return Array.from(chinese).map(char => ({
-		hanzi: char,
-		pinyin: isHanzi(char) ? fakePinyin(char) : ''
-	}));
+function createDemoTokens(chinese) {
+   return Array.from(chinese).map(char => ({
+	   hanzi: char,
+	   pinyin: isHanzi(char) ? fakePinyin(char) : ''
+   }));
 }
 
 function makeId() {
