@@ -127,12 +127,25 @@ export function initGeneration(renderStudy) {
 			   showSuccess(generated.title);
 			   renderStudy();
 		   } catch (error) {
+			   console.error('Generation failed:', error);
 			   if (error && error.name === 'AbortError') {
 				   showError('Generazione annullata.');
+			   } else if (typeof error.message === 'string' && error.message.includes('invalid JSON')) {
+				   showError('La risposta AI non era in formato valido. Riprova con un testo più corto.');
+			   } else if (typeof error.message === 'string' && error.message.includes('empty response')) {
+				   showError('L’AI ha restituito una risposta vuota. Riprova.');
+			   } else if (typeof error.message === 'string' && error.message.includes('request invalid')) {
+				   showError('La richiesta AI non è valida. Prova una lunghezza minore o un argomento più semplice.');
+			   } else if (typeof error.message === 'string' && (error.message.includes('not authorized') || error.message.includes('API key invalid'))) {
+				   showError('API key non valida o non autorizzata.');
+			   } else if (typeof error.message === 'string' && error.message.includes('temporarily unavailable')) {
+				   showError('Servizio Gemini temporaneamente non disponibile. Riprova più tardi.');
+			   } else if (isQuotaError(error)) {
+				   showError('Limite gratuito AI raggiunto. Riprova più tardi.');
 			   } else {
 				   showError(getFriendlyAIErrorMessage(error));
-				   renderStudy();
 			   }
+			   renderStudy();
 		   } finally {
 			   genBtn.disabled = false;
 			   retryBtn.disabled = false;

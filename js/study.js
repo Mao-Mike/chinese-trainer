@@ -384,6 +384,19 @@ export function initStudy() {
 		}
 	}
 
+	function hasUsefulPinyinTokens(block) {
+		const tokens = Array.isArray(block?.tokens) ? block.tokens : [];
+
+		if (!tokens.length) return false;
+
+		return tokens.some(token => {
+			const hanzi = typeof token?.hanzi === 'string' ? token.hanzi.trim() : '';
+			const pinyin = typeof token?.pinyin === 'string' ? token.pinyin.trim() : '';
+
+			return containsHanzi(hanzi) && !!pinyin;
+		});
+	}
+
 	async function handlePinyinClick() {
 		const content = loadCurrentContent();
 		syncContentIdentity(content);
@@ -408,7 +421,9 @@ export function initStudy() {
 				pinyinGenerated: true,
 				blocks: content.blocks.map(block => ({
 					...block,
-					tokens: tokenizeChineseWithDictionary(block.chinese, combined)
+					tokens: hasUsefulPinyinTokens(block)
+						? block.tokens
+						: tokenizeChineseWithDictionary(block.chinese, combined)
 				}))
 			};
 

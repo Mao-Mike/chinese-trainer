@@ -28,15 +28,24 @@ export async function callGeminiJSON(prompt, options = {}) {
 		   signal: options.signal
 	   });
 
-	if (!response.ok) {
-		let body = '';
-		try { body = (await response.text()).trim(); } catch { body = ''; }
-		console.error('Gemini HTTP error', { status: response.status, model, body });
-		if (response.status === 429 || /quota|rate/i.test(body)) {
-			throw new Error('Gemini quota limit reached');
-		}
-		throw new Error(`Gemini request failed (${response.status})`);
-	}
+	   if (!response.ok) {
+		   let body = '';
+		   try { body = (await response.text()).trim(); } catch { body = ''; }
+		   console.error('Gemini HTTP error', { status: response.status, model, body });
+		   if (response.status === 400) {
+			   throw new Error('Gemini request invalid. Check prompt or model.');
+		   }
+		   if (response.status === 401 || response.status === 403) {
+			   throw new Error('Gemini API key invalid or not authorized.');
+		   }
+		   if (response.status === 429 || /quota|rate|limit/i.test(body)) {
+			   throw new Error('Gemini quota limit reached.');
+		   }
+		   if ([500, 502, 503, 504].includes(response.status)) {
+			   throw new Error('Gemini service temporarily unavailable.');
+		   }
+		   throw new Error(`Gemini request failed (${response.status})`);
+	   }
 
 	let responseData;
 	let rawResponse = '';
