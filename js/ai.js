@@ -68,11 +68,11 @@ export async function generateContentWithAI(options = {}) {
 	const targetLength = Number(options?.targetLength) || 100;
 	const hanziVocabulary = selectHanziVocabulary(options?.words, 120);
 	const key = `generate:${type}:${targetLength}:${topic}:${JSON.stringify(hanziVocabulary)}`;
-	return dedupeAIRequest(key, async () => {
-		incrementAIUsage('generation');
-		const prompt = PROMPT_GENERATE + JSON.stringify({ type, topic, targetLength }, null, 2) + "\n\nUser vocabulary hanzi only:\n" + JSON.stringify(hanziVocabulary, null, 2);
-		const result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 8192 });
-		const normalized = normalizeGeneratedContent(result);
+	   return dedupeAIRequest(key, async () => {
+		   incrementAIUsage('generation');
+		   const prompt = PROMPT_GENERATE + JSON.stringify({ type, topic, targetLength }, null, 2) + "\n\nUser vocabulary hanzi only:\n" + JSON.stringify(hanziVocabulary, null, 2);
+		   const result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 8192, signal: options.signal });
+		   const normalized = normalizeGeneratedContent(result);
 		if (!normalized || !Array.isArray(normalized.blocks) || !normalized.blocks.length) {
 			throw new Error('Gemini returned content without blocks.');
 		}
@@ -106,83 +106,3 @@ export async function generateContentWithAI(options = {}) {
 	});
 }
 
-// Le funzioni legacy translateContentWithAI ed explainContentWithAI possono essere migrate qui se necessario.
-
-export async function translateContentWithAI(content) {
-	const prompt = `You are a concise Chinese to English translator.
-
-Translate the provided Chinese learning content into natural English.
-
-Return ONLY valid JSON:
-{
-  "blocks": [
-    {
-      "ref": "[1]",
-      "translation": ""
-    }
-  ]
-}
-
-Rules:
-- Keep the same refs.
-- Translate only the provided Chinese text.
-- Do not add explanations.
-- Do not add pinyin.
-- Do not add alternatives.
-- Do not add summaries.
-- No markdown.
-- No text outside JSON.
-
-Content:
-${JSON.stringify(content ?? {}, null, 2)}`;
-
-	const result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 8192 });
-	const resultBlocks = Array.isArray(result?.blocks) ? result.blocks : [];
-	if (!resultBlocks.length) {
-		throw new Error('Gemini returned content without blocks.');
-	}
-
-	const fallbackRefs = buildRefsFromContent(content, resultBlocks.length);
-	const blocks = mapBlocksWithField(resultBlocks, fallbackRefs, 'translation');
-
-	return { blocks };
-}
-
-export async function explainContentWithAI(content) {
-	const prompt = `You are a Chinese language teacher.
-
-Improve the explanations for this generated Chinese learning content.
-
-Return ONLY valid JSON:
-{
-  "blocks": [
-    {
-      "ref": "[1]",
-      "explanation": ""
-    }
-  ]
-}
-
-Rules:
-- Explanation must be in English.
-- Explain meaning, grammar and syntax concisely.
-- Do not generate pinyin.
-- Do not generate full translation.
-- Keep the same refs.
-- No markdown.
-- No text outside JSON.
-
-Content:
-${JSON.stringify(content ?? {}, null, 2)}`;
-
-	const result = await callGeminiJSON(prompt, { temperature: 0.2, maxOutputTokens: 8192 });
-	const resultBlocks = Array.isArray(result?.blocks) ? result.blocks : [];
-	if (!resultBlocks.length) {
-		throw new Error('Gemini returned content without blocks.');
-	}
-
-	const fallbackRefs = buildRefsFromContent(content, resultBlocks.length);
-	const blocks = mapBlocksWithField(resultBlocks, fallbackRefs, 'explanation');
-
-	return { blocks };
-}

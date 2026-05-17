@@ -1,136 +1,3 @@
-/* === STORICO GENERAZIONI === */
-.study-history-bar {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	margin-bottom: 10px;
-	padding: 8px 0 0 0;
-	flex-wrap: wrap;
-}
-.study-history-bar label {
-	font-size: 0.95rem;
-	color: var(--color-text-muted);
-	margin-right: 2px;
-}
-.study-history-select {
-	min-width: 120px;
-	max-width: 220px;
-	font-size: 0.97rem;
-	padding: 0 8px;
-	height: 36px;
-	border-radius: 8px;
-	border: 1px solid var(--color-border);
-	background: var(--color-surface-muted);
-	color: var(--color-text);
-}
-#study-history-delete {
-	min-width: 36px;
-	height: 36px;
-	padding: 0 8px;
-	font-size: 1.1rem;
-	border-radius: 8px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-@media (max-width: 420px) {
-	.study-history-bar {
-		flex-direction: column;
-		align-items: stretch;
-		gap: 6px;
-	}
-	.study-history-select {
-		max-width: 100vw;
-		min-width: 0;
-	}
-}
-
-/* ...deduplicato in fondo al file... */
-.pinyin-empty {
-	visibility: hidden;
-}
-
-.temp-dictionary-card {
-	margin-top: 18px;
-	padding: 18px 12px 16px 12px;
-	background: var(--color-surface);
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-soft);
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	max-width: 100%;
-	overflow-x: auto;
-}
-.temp-dictionary-header {
-	width: 100%;
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 10px;
-}
-.temp-word-browser {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 100%;
-	margin-bottom: 12px;
-}
-.temp-word-display {
-	min-width: 120px;
-	min-height: 90px;
-	width: 120px;
-	height: 90px;
-	background: var(--color-surface-muted);
-	border-radius: var(--radius-sm);
-	margin: 0 16px;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	box-shadow: 0 2px 8px rgba(20,40,30,0.04);
-}
-.temp-word-hanzi {
-	font-size: 2.2rem;
-	font-weight: 700;
-	color: var(--color-primary-dark);
-	margin-bottom: 6px;
-	text-align: center;
-}
-.temp-word-pinyin {
-	font-size: 1.1rem;
-	color: var(--color-text-muted);
-	text-align: center;
-}
-.temp-word-actions {
-	display: flex;
-	gap: 12px;
-	justify-content: center;
-	width: 100%;
-	margin-top: 8px;
-}
-.temp-dictionary-card .btn {
-	min-width: 80px;
-}
-@media (max-width: 420px) {
-	.temp-dictionary-card {
-		padding: 12px 2vw 12px 2vw;
-		max-width: 100vw;
-		box-sizing: border-box;
-	}
-	.temp-word-display {
-		min-width: 90px;
-		width: 90px;
-		height: 70px;
-	}
-	.temp-word-hanzi {
-		font-size: 1.5rem;
-	}
-	.temp-word-pinyin {
-		font-size: 0.95rem;
-	}
-}
 :root {
 	--color-primary: #2e7d5b;
 	--color-primary-dark: #1f5f45;
@@ -171,7 +38,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
 	font: inherit;
 }
 
@@ -180,10 +48,21 @@ button {
 	-webkit-tap-highlight-color: transparent;
 }
 
+button:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
 img {
 	max-width: 100%;
 	display: block;
 }
+
+.hidden {
+	display: none !important;
+}
+
+/* ===================== LAYOUT ===================== */
 
 .app-header {
 	width: 100%;
@@ -208,7 +87,6 @@ h1 {
 	font-size: 1.4rem;
 	line-height: 1.15;
 	font-weight: 700;
-	letter-spacing: 0;
 }
 
 .chinese-title {
@@ -217,7 +95,6 @@ h1 {
 	font-size: 1.3rem;
 	line-height: 1.15;
 	font-weight: 700;
-	letter-spacing: 0;
 }
 
 .icon-btn {
@@ -236,7 +113,6 @@ h1 {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	flex: 0 0 auto;
 }
 
 .app-main {
@@ -365,7 +241,8 @@ h1 {
 
 .status-message,
 .dict-status,
-.settings-status {
+.settings-status,
+.study-status {
 	min-height: 0;
 	font-size: 0.88rem;
 	line-height: 1.35;
@@ -390,6 +267,7 @@ h1 {
 	color: var(--color-primary-dark);
 }
 
+/* ===================== DICTIONARY ===================== */
 
 .dict-entry-grid {
 	display: grid;
@@ -422,6 +300,17 @@ h1 {
 
 .dict-list-card {
 	padding-bottom: 12px;
+}
+
+.dict-search-clear {
+	margin-left: 4px;
+	border: none;
+	background: transparent;
+	color: var(--color-text-muted);
+	font-size: 1.25rem;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0 6px;
 }
 
 .dict-list {
@@ -482,6 +371,14 @@ h1 {
 	border-color: #f0d3d3;
 	background: #fdf3f3;
 }
+
+@media (hover: hover) {
+	.dict-search-clear:hover {
+		background: #f1f5f3;
+	}
+}
+
+/* ===================== GENERATION ===================== */
 
 .generation-card {
 	padding-top: 18px;
@@ -544,6 +441,17 @@ h1 {
 	accent-color: var(--color-primary);
 }
 
+.gen-actions-row {
+	display: grid;
+	gap: 8px;
+	justify-items: center;
+	margin-bottom: 14px;
+}
+
+#gen-cancel {
+	margin-top: 0;
+}
+
 .gen-title {
 	margin-top: 14px;
 	font-size: 0.95rem;
@@ -563,16 +471,23 @@ h1 {
 	margin: 8px auto 0;
 }
 
-/* ...deduplicato in fondo al file... */
+/* ===================== STUDY ===================== */
+
+.study-toolbar,
+.study-toolbar--bottom {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-bottom: 10px;
+}
+
+.study-toolbar .btn,
+.study-toolbar--bottom .btn {
+	flex: 1 1 120px;
+}
 
 .study-toolbar--bottom {
 	margin-top: 10px;
-	gap: 8px;
-	flex-wrap: wrap;
-}
-
-.study-toolbar--bottom .btn {
-	flex: 1 1 150px;
 }
 
 .study-status {
@@ -636,6 +551,10 @@ h1 {
 	white-space: nowrap;
 }
 
+.pinyin-empty {
+	visibility: hidden;
+}
+
 .hanzi {
 	font-size: 1.34rem;
 	font-weight: 600;
@@ -685,6 +604,120 @@ h1 {
 	font-weight: 700;
 }
 
+/* ===================== STUDY HISTORY ===================== */
+
+.study-history-bar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 10px;
+	padding: 8px 0 0;
+	flex-wrap: wrap;
+}
+
+.study-history-bar label {
+	font-size: 0.95rem;
+	color: var(--color-text-muted);
+	margin-right: 2px;
+}
+
+.study-history-select {
+	min-width: 120px;
+	max-width: 220px;
+	font-size: 0.97rem;
+	padding: 0 8px;
+	height: 36px;
+	border-radius: 8px;
+	border: 1px solid var(--color-border);
+	background: var(--color-surface-muted);
+	color: var(--color-text);
+}
+
+#study-history-delete {
+	min-width: 36px;
+	height: 36px;
+	padding: 0 8px;
+	border-radius: 8px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* ===================== TEMPORARY DICTIONARY ===================== */
+
+.temp-dictionary-card {
+	margin-top: 18px;
+	padding: 18px 12px 16px;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-soft);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.temp-dictionary-header {
+	width: 100%;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 10px;
+}
+
+.temp-word-browser {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	margin-bottom: 12px;
+}
+
+.temp-word-display {
+	min-width: 120px;
+	min-height: 90px;
+	width: 120px;
+	height: 90px;
+	background: var(--color-surface-muted);
+	border-radius: var(--radius-sm);
+	margin: 0 16px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 2px 8px rgba(20, 40, 30, 0.04);
+}
+
+.temp-word-hanzi {
+	font-size: 2.2rem;
+	font-weight: 700;
+	color: var(--color-primary-dark);
+	margin-bottom: 6px;
+	text-align: center;
+}
+
+.temp-word-pinyin {
+	font-size: 1.1rem;
+	color: var(--color-text-muted);
+	text-align: center;
+}
+
+.temp-word-actions {
+	display: flex;
+	gap: 12px;
+	justify-content: center;
+	width: 100%;
+	margin-top: 8px;
+}
+
+.temp-dictionary-card .btn {
+	min-width: 80px;
+}
+
+/* ===================== SETTINGS ===================== */
+
 .settings-card {
 	padding-top: 18px;
 }
@@ -698,7 +731,7 @@ h1 {
 .settings-group {
 	display: grid;
 	gap: 6px;
-	margin-bottom: 14px;
+	margin-bottom: 12px;
 }
 
 .settings-group label {
@@ -711,7 +744,6 @@ h1 {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 8px;
-	margin-top: 8px;
 }
 
 .settings-status {
@@ -719,9 +751,91 @@ h1 {
 	text-align: center;
 }
 
-.hidden {
-	display: none !important;
+/* ===================== AI USAGE CARD ===================== */
+
+.ai-usage-card {
+	margin-top: 14px;
+	padding: 12px;
+	border: 1px solid var(--color-border);
+	border-radius: 12px;
+	background: var(--color-surface-muted);
+	transition: background 0.15s, color 0.15s;
 }
+
+.ai-usage-header {
+	font-weight: 700;
+	color: var(--color-primary-dark);
+	margin-bottom: 8px;
+}
+
+.ai-usage-values {
+	display: grid;
+	gap: 4px;
+	font-size: 0.9rem;
+	color: var(--color-text-muted);
+	margin-bottom: 10px;
+}
+
+.ai-usage-reset {
+	width: 100%;
+}
+
+/* ===================== MODAL ===================== */
+
+.modal-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 18px;
+	background: rgba(31, 41, 51, 0.35);
+}
+
+.modal-card {
+	width: min(100%, 360px);
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-soft);
+	padding: 16px;
+}
+
+.modal-header {
+	margin-bottom: 10px;
+}
+
+.modal-title {
+	margin: 0;
+	font-size: 1.1rem;
+	color: var(--color-primary-dark);
+}
+
+.modal-message {
+	font-size: 1rem;
+	line-height: 1.4;
+	color: var(--color-text);
+	margin-bottom: 14px;
+}
+
+.modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.modal-cancel,
+.modal-confirm {
+	min-width: 90px;
+}
+
+.modal-card button:focus {
+	outline: 2px solid var(--color-primary-soft);
+	outline-offset: 2px;
+}
+
+/* ===================== RESPONSIVE ===================== */
 
 @media (max-width: 420px) {
 	.app-header {
@@ -774,6 +888,18 @@ h1 {
 		width: min(280px, 100%);
 	}
 
+	.study-history-bar {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 6px;
+	}
+
+	.study-history-select {
+		max-width: 100%;
+		min-width: 0;
+		width: 100%;
+	}
+
 	.study-text {
 		min-height: 160px;
 	}
@@ -790,7 +916,36 @@ h1 {
 		font-size: 0.7rem;
 	}
 
+	.temp-dictionary-card {
+		padding: 12px 2vw;
+		max-width: 100vw;
+		box-sizing: border-box;
+	}
+
+	.temp-word-display {
+		min-width: 90px;
+		width: 90px;
+		height: 70px;
+	}
+
+	.temp-word-hanzi {
+		font-size: 1.5rem;
+	}
+
+	.temp-word-pinyin {
+		font-size: 0.95rem;
+	}
+
 	.settings-actions {
 		grid-template-columns: 1fr;
+	}
+
+	.modal-actions {
+		flex-direction: column;
+	}
+
+	.modal-cancel,
+	.modal-confirm {
+		width: 100%;
 	}
 }

@@ -1,5 +1,6 @@
 ﻿import { enrichWordWithAI } from './ai.js';
 import { addWord, clearDatabase, deleteWordById, getAllWords, importWords } from './storage.js';
+import { hasGeminiApiKey, isQuotaError } from './utils.js';
 
 export function initDictionary() {
 	const dictInput = document.getElementById('dict-input');
@@ -27,18 +28,7 @@ export function initDictionary() {
 		dictStatus.className = state ? `dict-status ${state}` : 'dict-status';
 	}
 
-	function hasGeminiApiKey() {
-		try {
-			if (typeof localStorage === 'undefined') {
-				return false;
-			}
 
-			const value = localStorage.getItem('geminiApiKey') || localStorage.geminiApiKey || '';
-			return typeof value === 'string' && value.trim().length > 0;
-		} catch {
-			return false;
-		}
-	}
 
 	function normalizeStoredWord(word) {
 		return {
@@ -78,7 +68,8 @@ export function initDictionary() {
 			delBtn.title = 'Elimina';
 			delBtn.onclick = async () => {
 				delBtn.blur();
-				if (confirm(`Vuoi eliminare la parola "${word.hanzi}"?`)) {
+				const ok = await window.showConfirm(`Vuoi eliminare la parola "${word.hanzi}"?`, 'Conferma eliminazione');
+				if (ok) {
 					await deleteWordById(word.id);
 					await loadDict();
 				}
@@ -97,59 +88,69 @@ export function initDictionary() {
 	function filterAndRenderDict() {
 		const q = dictSearchInput.value.trim().toLowerCase();
 		let filtered = allWordsCache;
-
 		if (q) {
 			filtered = allWordsCache.filter(word =>
 				(word.hanzi && word.hanzi.toLowerCase().includes(q)) ||
 				(word.pinyin && word.pinyin.toLowerCase().includes(q))
 			);
 		}
-
 		renderDictList(filtered);
 	}
 
+	let pinyinPromiseMap = {};
+
 	async function findPinyin() {
-	   const hanzi = dictInput.value.trim();
-	   if (!hanzi) return null;
-	   if (!hasGeminiApiKey()) {
-		   setStatus('Inserisci la Gemini API key nelle Impostazioni.', 'error-message');
-		   return null;
-	   }
-	   const requestId = ++lookupToken;
-	   const originalLabel = dictFindBtn.textContent;
-	   dictFindBtn.disabled = true;
-	   dictAddBtn.disabled = true;
-	   dictFindBtn.textContent = 'Cerco...';
-	   setStatus('Cerco pinyin...', 'loading');
-	   try {
-		   const enriched = await enrichWordWithAI(hanzi);
-		   if (requestId !== lookupToken) return;
-		   const pinyin = typeof enriched.pinyin === 'string' ? enriched.pinyin.trim() : '';
-		   if (!pinyin) throw new Error('empty_pinyin');
-		   pendingWord = {
-			   hanzi: typeof enriched.hanzi === 'string' && enriched.hanzi.trim() ? enriched.hanzi.trim() : hanzi,
-			   pinyin,
-			   createdAt: Date.now()
-		   };
-		   setPreview(pendingWord.pinyin);
-		   setStatus('');
-		   return pendingWord;
-	   } catch (error) {
-		   if (requestId !== lookupToken) return null;
-		   pendingWord = null;
-		   setPreview('pinyin');
-		   if (error && typeof error.message === 'string' && error.message.toLowerCase().includes('quota')) {
-			   setStatus('Limite gratuito AI raggiunto. Riprova più tardi.', 'error-message');
-		   } else {
-			   setStatus('Non riesco a trovare il pinyin. Controlla API key o connessione.', 'error-message');
-		   }
-		   console.error(error);
-		   return null;
-	   } finally {
-		   dictFindBtn.disabled = false;
-		   dictAddBtn.disabled = false;
-		   dictFindBtn.textContent = originalLabel;
-	   }
+		const hanzi = dictInput.value.trim();
+		if (!hanzi) return null;
+		if (!hasGeminiApiKey()) {
+			setStatus('Inserisci la Gemini API key nelle Impostazioni.', 'error-message');
+			return null;
+		}
+		// Se già in corso per stesso hanzi, riusa promessa
+		if (pinyinPromiseMap[hanzi]) return pinyinPromiseMap[hanzi];
+		const requestId = ++lookupToken;
+		const originalLabel = dictFindBtn.textContent;
+		dictFindBtn.disabled = true;
+		dictAddBtn.disabled = true;
+		dictFindBtn.textContent = 'Cerco...';
+		setStatus('Cerco pinyin...', 'loading');
+		const promise = (async () => {
+			try {
+				const enriched = await enrichWordWithAI(hanzi);
+				if (requestId !== lookupToken) return;
+				const pinyin = typeof enriched.pinyin === 'string' ? enriched.pinyin.trim() : '';
+				if (!pinyin) throw new Error('empty_pinyin');
+				pendingWord = {
+					hanzi: typeof enriched.hanzi === 'string' && enriched.hanzi.trim() ? enriched.hanzi.trim() : hanzi,
+					pinyin,
+					createdAt: Date.now()
+				};
+				setPreview(pendingWord.pinyin);
+				setStatus('');
+				return pendingWord;
+			} catch (error) {
+				if (requestId !== lookupToken) return null;
+				pendingWord = null;
+				setPreview('pinyin');
+				if (isQuotaError(error)) {
+					setStatus('Limite gratuito AI raggiunto. Riprova più tardi.', 'error-message');
+				} else {
+					setStatus('Non riesco a trovare il pinyin. Controlla API key o connessione.', 'error-message');
+				}
+				console.error(error);
+				return null;
+			} finally {
+				dictFindBtn.disabled = false;
+				dictAddBtn.disabled = false;
+				dictFindBtn.textContent = originalLabel;
+				// Rimuovi promessa solo se è ancora la stessa richiesta
+				if (pinyinPromiseMap[hanzi] && requestId === lookupToken) {
+					delete pinyinPromiseMap[hanzi];
+				}
+			}
+		})();
+		pinyinPromiseMap[hanzi] = promise;
+		return promise;
 	}
 
 	dictInput.addEventListener('input', () => {
@@ -159,42 +160,67 @@ export function initDictionary() {
 
 	dictSearchInput.addEventListener('input', filterAndRenderDict);
 
-	dictFindBtn.onclick = findPinyin;
+	// Pulsante per svuotare la ricerca
+	let dictSearchClear = document.getElementById('dict-search-clear');
+	if (!dictSearchClear) {
+		dictSearchClear = document.createElement('button');
+		dictSearchClear.id = 'dict-search-clear';
+		dictSearchClear.type = 'button';
+		dictSearchClear.className = 'dict-search-clear';
+		dictSearchClear.textContent = '×';
+		dictSearchClear.title = 'Svuota ricerca';
+		dictSearchInput.parentNode.insertBefore(dictSearchClear, dictSearchInput.nextSibling);
+	}
+	dictSearchClear.onclick = () => {
+		dictSearchInput.value = '';
+		filterAndRenderDict();
+		dictSearchInput.focus();
+	};
+
+	dictFindBtn.onclick = async () => {
+		const hanzi = dictInput.value.trim();
+		if (!hanzi) return;
+		if (!hasGeminiApiKey()) {
+			setStatus('Inserisci la Gemini API key nelle Impostazioni.', 'error-message');
+			return;
+		}
+		await findPinyin();
+	};
 
 	dictAddBtn.onclick = async () => {
-	   const hanzi = dictInput.value.trim();
-	   if (!hanzi) return;
-	   if (!hasGeminiApiKey()) {
-		   setStatus('Inserisci la Gemini API key nelle Impostazioni.', 'error-message');
-		   return;
-	   }
-	   let wordToSave = isCurrentWord(pendingWord, hanzi) ? pendingWord : null;
-	   dictAddBtn.disabled = true;
-	   dictFindBtn.disabled = true;
-	   const originalLabel = dictAddBtn.textContent;
-	   dictAddBtn.textContent = 'Salvo...';
-	   try {
-		   if (!wordToSave) wordToSave = await findPinyin();
-		   if (!isCurrentWord(wordToSave, hanzi)) return;
-		   await addWord(wordToSave.hanzi, wordToSave.pinyin);
-		   dictInput.value = '';
-		   clearPendingWord();
-		   setStatus('');
-		   await loadDict();
-	   } catch (error) {
-		   if (error && error.message === 'Duplicato') {
-			   setStatus('Questa parola esiste già!', 'error-message');
-		   } else if (error && typeof error.message === 'string' && error.message.toLowerCase().includes('quota')) {
-			   setStatus('Limite gratuito AI raggiunto. Riprova più tardi.', 'error-message');
-		   } else {
-			   console.error(error);
-			   setStatus('Errore durante il salvataggio della parola.', 'error-message');
-		   }
-	   } finally {
-		   dictAddBtn.disabled = false;
-		   dictFindBtn.disabled = false;
-		   dictAddBtn.textContent = originalLabel;
-	   }
+		const hanzi = dictInput.value.trim();
+		if (!hanzi) return;
+		if (!hasGeminiApiKey()) {
+			setStatus('Inserisci la Gemini API key nelle Impostazioni.', 'error-message');
+			return;
+		}
+		let wordToSave = isCurrentWord(pendingWord, hanzi) ? pendingWord : null;
+		dictAddBtn.disabled = true;
+		dictFindBtn.disabled = true;
+		const originalLabel = dictAddBtn.textContent;
+		dictAddBtn.textContent = 'Salvo...';
+		try {
+			if (!wordToSave) wordToSave = await findPinyin();
+			if (!isCurrentWord(wordToSave, hanzi)) return;
+			await addWord(wordToSave.hanzi, wordToSave.pinyin);
+			dictInput.value = '';
+			clearPendingWord();
+			setStatus('');
+			await loadDict();
+		} catch (error) {
+			if (error && error.message === 'Duplicato') {
+				setStatus('Questa parola esiste già!', 'error-message');
+			} else if (isQuotaError(error)) {
+				setStatus('Limite gratuito AI raggiunto. Riprova più tardi.', 'error-message');
+			} else {
+				console.error(error);
+				setStatus('Errore durante il salvataggio della parola.', 'error-message');
+			}
+		} finally {
+			dictAddBtn.disabled = false;
+			dictFindBtn.disabled = false;
+			dictAddBtn.textContent = originalLabel;
+		}
 	};
 
 	dictExportBtn.onclick = async () => {
@@ -224,18 +250,19 @@ export function initDictionary() {
 			})).filter(word => word.hanzi);
 
 			await importWords(words);
-			loadDict();
+			await loadDict();
 		} catch {
-			alert('File non valido');
+			await window.showAlert('File non valido', 'Errore');
 		}
 
 		dictImportFile.value = '';
 	};
 
 	dictClearBtn.onclick = async () => {
-		if (confirm('Vuoi cancellare tutti i caratteri dal dizionario?')) {
+		const ok = await window.showConfirm('Vuoi cancellare tutti i caratteri dal dizionario?', 'Conferma cancellazione');
+		if (ok) {
 			await clearDatabase();
-			loadDict();
+			await loadDict();
 		}
 	};
 

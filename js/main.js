@@ -4,6 +4,10 @@ import { initDictionary } from './dictionary.js';
 import { initGeneration } from './generation.js';
 import { initStudy } from './study.js';
 import { initSettings } from './settings.js';
+import { showAlert, showConfirm } from './ui.js';
+
+window.showAlert = showAlert;
+window.showConfirm = showConfirm;
 
 async function bootstrap() {
 	try {

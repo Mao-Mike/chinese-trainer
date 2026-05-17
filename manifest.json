@@ -1,11 +1,11 @@
 ﻿{
-    "name":  "Chinese Trainer",
-    "short_name":  "Chinese",
-    "start_url":  "./",
-    "display":  "standalone",
-    "background_color":  "#ffffff",
-    "theme_color":  "#ffffff",
-    "orientation":  "portrait",
+    "name": "Il tuo compagno cinese",
+    "short_name": "Cinese",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#f6f8f7",
+    "theme_color": "#2e7d5b",
+    "orientation": "portrait",
     "icons":  [
                   {
                       "purpose":  "any maskable",

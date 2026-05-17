@@ -12,20 +12,21 @@ export async function callGeminiJSON(prompt, options = {}) {
 	const temperature = typeof options.temperature === 'number' ? options.temperature : 0.2;
 	const maxOutputTokens = typeof options.maxOutputTokens === 'number' ? options.maxOutputTokens : 8192;
 
-	const response = await fetch(endpoint, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			contents: [
-				{ role: 'user', parts: [{ text: String(prompt) }] }
-			],
-			generationConfig: {
-				temperature,
-				maxOutputTokens,
-				responseMimeType: 'application/json'
-			}
-		})
-	});
+	   const response = await fetch(endpoint, {
+		   method: 'POST',
+		   headers: { 'Content-Type': 'application/json' },
+		   body: JSON.stringify({
+			   contents: [
+				   { role: 'user', parts: [{ text: String(prompt) }] }
+			   ],
+			   generationConfig: {
+				   temperature,
+				   maxOutputTokens,
+				   responseMimeType: 'application/json'
+			   }
+		   }),
+		   signal: options.signal
+	   });
 
 	if (!response.ok) {
 		let body = '';

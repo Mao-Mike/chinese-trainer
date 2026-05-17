@@ -1,5 +1,6 @@
 ﻿import { generateContentWithAI } from './ai.js';
 import { getAllWords, saveLastGenerated, clearTemporaryWords, addTemporaryWord } from './storage.js';
+import { hasGeminiApiKey, getFriendlyAIErrorMessage, isQuotaError } from './utils.js';
 
 function setStatusState(element, state) {
 	element.classList.remove('loading', 'error-message', 'success-message');
@@ -8,34 +9,14 @@ function setStatusState(element, state) {
 	}
 }
 
-function getGenerationErrorMessage(error) {
-	const message = error instanceof Error ? error.message : String(error || '');
-	const normalized = message.toLowerCase();
 
-	if (normalized.includes('api key')) {
-		return 'Inserisci la Gemini API key in Impostazioni.';
-	}
-
-	if (normalized.includes('invalid json')) {
-		return 'La risposta AI non era nel formato atteso. Riprova.';
-	}
-
-	if (normalized.includes('429') || normalized.includes('quota') || normalized.includes('rate')) {
-		return 'Limite temporaneo API raggiunto. Riprova più tardi.';
-	}
-
-	if (normalized.includes('400') || normalized.includes('model')) {
-		return 'Modello Gemini non valido o richiesta non accettata.';
-	}
-
-	return 'Generazione non riuscita. Riprova con un testo più breve.';
-}
 
 export function initGeneration(renderStudy) {
 	const genTypeRadios = document.getElementsByName('gen-type');
 	const genLength = document.getElementById('gen-length');
 	const genLengthValue = document.getElementById('gen-length-value');
 	const genBtn = document.getElementById('gen-generate');
+	const genCancelBtn = document.getElementById('gen-cancel');
 	const genTitle = document.getElementById('gen-title');
 	const genTopicInput = document.getElementById('gen-topic');
 	const retryBtn = document.getElementById('gen-retry') || (() => {
@@ -51,26 +32,29 @@ export function initGeneration(renderStudy) {
 
 	let lastGenerationRequest = null;
 
-	function showLoading() {
-		genTitle.textContent = 'Generazione in corso...';
-		genTitle.classList.remove('hidden');
-		setStatusState(genTitle, 'loading');
-		retryBtn.classList.add('hidden');
-	}
+	   function showLoading() {
+		   genTitle.textContent = 'Generazione in corso...';
+		   genTitle.classList.remove('hidden');
+		   setStatusState(genTitle, 'loading');
+		   retryBtn.classList.add('hidden');
+		   if (genCancelBtn) genCancelBtn.classList.remove('hidden');
+	   }
 
-	function showError(message) {
-		genTitle.textContent = message;
-		genTitle.classList.remove('hidden');
-		setStatusState(genTitle, 'error-message');
-		retryBtn.classList.remove('hidden');
-	}
+	   function showError(message) {
+		   genTitle.textContent = message;
+		   genTitle.classList.remove('hidden');
+		   setStatusState(genTitle, 'error-message');
+		   retryBtn.classList.remove('hidden');
+		   if (genCancelBtn) genCancelBtn.classList.add('hidden');
+	   }
 
-	function showSuccess(title) {
-		genTitle.textContent = title || '';
-		genTitle.classList.toggle('hidden', !title);
-		setStatusState(genTitle, title ? 'success-message' : '');
-		retryBtn.classList.add('hidden');
-	}
+	   function showSuccess(title) {
+		   genTitle.textContent = title || '';
+		   genTitle.classList.toggle('hidden', !title);
+		   setStatusState(genTitle, title ? 'success-message' : '');
+		   retryBtn.classList.add('hidden');
+		   if (genCancelBtn) genCancelBtn.classList.add('hidden');
+	   }
 
 	genLengthValue.textContent = genLength.value;
 	genLength.oninput = () => {
@@ -83,34 +67,46 @@ export function initGeneration(renderStudy) {
 		}
 	};
 
-	function hasGeminiApiKey() {
-		try {
-			if (typeof localStorage === 'undefined') {
-				return false;
-			}
 
-			const value = localStorage.getItem('geminiApiKey') || localStorage.geminiApiKey;
-			return typeof value === 'string' && value.trim().length > 0;
-		} catch {
-			return false;
-		}
-	}
 
+
+	   let currentAbortController = null;
+	   let isGenerating = false;
 	   async function handleGeneration(request) {
-		   if (!hasGeminiApiKey()) {
-			   showError('Inserisci la Gemini API key in Impostazioni.');
-			   return;
-		   }
-		   genBtn.disabled = true;
-		   retryBtn.disabled = true;
-		   showLoading();
+		   if (isGenerating) return;
+		   isGenerating = true;
 		   try {
+			   if (!hasGeminiApiKey()) {
+				   showError('Inserisci la Gemini API key in Impostazioni.');
+				   return;
+			   }
+			   genBtn.disabled = true;
+			   retryBtn.disabled = true;
+			   showLoading();
+			   if (genCancelBtn) genCancelBtn.disabled = false;
+			   currentAbortController = new AbortController();
+			   let generationAborted = false;
+			   const abortHandler = () => {
+				   generationAborted = true;
+				   if (genCancelBtn) genCancelBtn.disabled = true;
+			   };
+			   if (genCancelBtn) genCancelBtn.onclick = () => {
+				   if (currentAbortController) {
+					   currentAbortController.abort();
+					   abortHandler();
+				   }
+			   };
 			   const generated = await generateContentWithAI({
 				   type: request.type,
 				   topic: request.topic,
 				   targetLength: request.length,
-				   words: request.words
+				   words: request.words,
+				   signal: currentAbortController.signal
 			   });
+			   if (generationAborted) {
+				   showError('Generazione annullata.');
+				   return;
+			   }
 			   await saveLastGenerated(generated); // salva anche nello storico e imposta current
 			   // Dizionario temporaneo: svuota, aggiungi newWords
 			   try {
@@ -131,27 +127,34 @@ export function initGeneration(renderStudy) {
 			   showSuccess(generated.title);
 			   renderStudy();
 		   } catch (error) {
-			   console.error(error);
-			   if (error && typeof error.message === 'string' && error.message.toLowerCase().includes('quota')) {
-				   showError('Limite gratuito AI raggiunto. Riprova più tardi.');
+			   if (error && error.name === 'AbortError') {
+				   showError('Generazione annullata.');
 			   } else {
-				   showError(getGenerationErrorMessage(error));
+				   showError(getFriendlyAIErrorMessage(error));
+				   renderStudy();
 			   }
-			   renderStudy();
 		   } finally {
 			   genBtn.disabled = false;
 			   retryBtn.disabled = false;
+			   if (genCancelBtn) {
+				   genCancelBtn.classList.add('hidden');
+				   genCancelBtn.disabled = false;
+				   genCancelBtn.onclick = null;
+			   }
+			   currentAbortController = null;
+			   isGenerating = false;
 		   }
 	   }
 
-	genBtn.onclick = async () => {
-		const type = Array.from(genTypeRadios).find(radio => radio.checked).value;
-		const length = parseInt(genLength.value, 10);
-		const topic = genTopicInput.value.trim();
-		const words = await getAllWords();
+	   genBtn.onclick = async () => {
+		   if (isGenerating) return;
+		   const type = Array.from(genTypeRadios).find(radio => radio.checked).value;
+		   const length = parseInt(genLength.value, 10);
+		   const topic = genTopicInput.value.trim();
+		   const words = await getAllWords();
 
-		lastGenerationRequest = { type, length, topic, words };
-		await handleGeneration(lastGenerationRequest);
-	};
+		   lastGenerationRequest = { type, length, topic, words };
+		   await handleGeneration(lastGenerationRequest);
+	   };
 }
 

@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="it">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 	<meta name="theme-color" content="#2e7d5b">
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-status-bar-style" content="default">
-	<title>Chinese Trainer</title>
+	<title>Il tuo compagno cinese</title>
 	<link rel="manifest" href="manifest.json">
 	<link rel="stylesheet" href="style.css">
 	<link rel="apple-touch-icon" href="icon-192.png">
@@ -64,7 +64,10 @@
 					<label for="gen-length" class="gen-length-label">Lunghezza: <span id="gen-length-value">100</span> caratteri</label>
 					<input type="range" id="gen-length" min="10" max="1000" step="10" value="100">
 				</div>
-				<button id="gen-generate" class="btn btn-primary btn-large" type="button">Scrivi</button>
+								<div class="gen-actions-row">
+									<button id="gen-generate" class="btn btn-primary btn-large" type="button">Scrivi</button>
+									<button id="gen-cancel" class="btn btn-secondary btn-large hidden" type="button">Annulla</button>
+								</div>
 				<div id="gen-title" class="gen-title hidden"></div>
 			</div>
 		</section>
@@ -128,7 +131,16 @@
 					<button id="settings-delete-key" class="btn btn-danger" type="button">Elimina key</button>
 					<button id="settings-test" class="btn btn-secondary" type="button">Test</button>
 				</div>
-				<div id="settings-status" class="status-message settings-status"></div>
+								<div id="settings-status" class="status-message settings-status"></div>
+								<div class="ai-usage-card" id="ai-usage-card">
+									<div class="ai-usage-header">Uso AI oggi</div>
+									<div class="ai-usage-values">
+										<span id="ai-usage-total">Totale: 0</span>
+										<span id="ai-usage-generation">Generazioni: 0</span>
+										<span id="ai-usage-pinyin">Pinyin: 0</span>
+									</div>
+									<button id="ai-usage-reset" class="btn btn-secondary ai-usage-reset" type="button">Azzera contatore</button>
+								</div>
 			</div>
 		</section>
 	</main>
@@ -139,6 +151,19 @@
 		<button class="tab-btn" data-tab="study" type="button">Esercizio</button>
 	</nav>
 
-	<script type="module" src="js/main.js"></script>
+		<!-- Modale riutilizzabile -->
+		<div id="app-modal" class="modal-overlay" tabindex="-1" aria-modal="true" aria-hidden="true" style="display:none;">
+			<div class="modal-card" role="dialog" aria-labelledby="app-modal-title" aria-describedby="app-modal-message">
+				<div class="modal-header">
+					<h2 id="app-modal-title" class="modal-title"></h2>
+				</div>
+				<div id="app-modal-message" class="modal-message"></div>
+				<div class="modal-actions">
+					<button id="app-modal-cancel" class="btn btn-secondary modal-cancel" type="button">Annulla</button>
+					<button id="app-modal-confirm" class="btn btn-primary modal-confirm" type="button">Conferma</button>
+				</div>
+			</div>
+		</div>
+		<script type="module" src="js/main.js"></script>
 </body>
 </html>

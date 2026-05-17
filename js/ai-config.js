@@ -2,6 +2,7 @@
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 export const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+import { getStoredValue } from './utils.js';
 
 function readStorageValue(key) {
 	try {
@@ -16,9 +17,9 @@ function readStorageValue(key) {
 }
 
 export function getGeminiApiKey() {
-	return readStorageValue('geminiApiKey');
+	return getStoredValue('geminiApiKey');
 }
 
 export function getGeminiModel() {
-	return readStorageValue('geminiModel') || DEFAULT_GEMINI_MODEL;
+	return getStoredValue('geminiModel') || DEFAULT_GEMINI_MODEL;
 }
